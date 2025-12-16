@@ -7,6 +7,7 @@ import { classifyTopicSmart } from '@/lib/smart-topic-extractor';
 import { Edit3, Clock, Grid, Tag, MoreVertical, Check, Trash2, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
+import { normalizeDate } from '@/lib/date-utils';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -143,14 +144,14 @@ export default function AffinityDiagram({
   // 시간별 정렬 함수
   const sortByTime = (notes: StickyNote[]) => {
     const sortedNotes = [...notes].sort((a, b) => {
-      const dateA = a.createdAt instanceof Date ? a.createdAt : new Date(a.createdAt);
-      const dateB = b.createdAt instanceof Date ? b.createdAt : new Date(b.createdAt);
+      const dateA = normalizeDate(a.createdAt);
+      const dateB = normalizeDate(b.createdAt);
       return dateB.getTime() - dateA.getTime();
     });
     
     // 날짜별로 그룹화
     const groupedByDate = sortedNotes.reduce((acc, note) => {
-      const noteDate = note.createdAt instanceof Date ? note.createdAt : new Date(note.createdAt);
+      const noteDate = normalizeDate(note.createdAt);
       const dateKey = format(noteDate, 'yyyy-MM-dd');
       if (!acc[dateKey]) {
         acc[dateKey] = [];
@@ -382,7 +383,7 @@ export default function AffinityDiagram({
                               {group}
                             </span>
                             <span className="text-xs text-gray-500">
-                              {format(note.createdAt instanceof Date ? note.createdAt : new Date(note.createdAt), 'MM.dd', { locale: ko })}
+                              {format(normalizeDate(note.createdAt), 'MM.dd', { locale: ko })}
                             </span>
                           </div>
                         </div>

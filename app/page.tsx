@@ -15,6 +15,10 @@ import { supabase } from '@/lib/supabase';
 import StickyNoteInput from '@/components/StickyNoteInput';
 import AffinityDiagram from '@/components/AffinityDiagram';
 import { useToast } from "@/hooks/use-toast";
+import { normalizeDate } from '@/lib/date-utils';
+import { normalizeError, getUserFriendlyError, logError, isRecoverableError } from '@/lib/error-handler';
+import { validateNoteContent } from '@/lib/validation';
+import { STORAGE_KEYS } from '@/lib/constants';
 
 export default function Home() {
   const [viewMode, setViewMode] = useState<ViewMode>('memo');
@@ -43,16 +47,25 @@ export default function Home() {
           setNotes(supabaseNotes);
         } else {
           // LocalStorage에서 노트 가져오기
-          const savedNotes = localStorage.getItem('sticky-notes');
+          const savedNotes = localStorage.getItem(STORAGE_KEYS.STICKY_NOTES);
           if (savedNotes) {
-            setNotes(JSON.parse(savedNotes));
+            const parsedNotes = JSON.parse(savedNotes);
+            // 날짜 정규화
+            const normalizedNotes = parsedNotes.map((note: StickyNote) => ({
+              ...note,
+              createdAt: normalizeDate(note.createdAt),
+              updatedAt: normalizeDate(note.updatedAt),
+            }));
+            setNotes(normalizedNotes);
           }
         }
       } catch (error) {
-        console.error('앱 초기화 실패:', error);
+        const appError = normalizeError(error);
+        logError(appError, { context: '앱 초기화' });
+        const userError = getUserFriendlyError(appError);
         toast({
-          title: "데이터 로드 실패",
-          description: "새로고침을 시도해주세요.",
+          title: userError.title,
+          description: userError.description,
           variant: "destructive",
         });
       } finally {
@@ -117,14 +130,16 @@ export default function Home() {
         await saveNoteToSupabase(updatedNotes[0]); // 새로운 노트는 항상 배열의 첫 번째
       } else {
         // LocalStorage에 저장
-        localStorage.setItem('sticky-notes', JSON.stringify(updatedNotes));
+        localStorage.setItem(STORAGE_KEYS.STICKY_NOTES, JSON.stringify(updatedNotes));
       }
       setNotes(updatedNotes);
     } catch (error) {
-      console.error('노트 저장 실패:', error);
+      const appError = normalizeError(error);
+      logError(appError, { context: '노트 저장' });
+      const userError = getUserFriendlyError(appError);
       toast({
-        title: "저장 실패",
-        description: "다시 시도해주세요.",
+        title: userError.title,
+        description: userError.description,
         variant: "destructive",
       });
     }
@@ -134,14 +149,26 @@ export default function Home() {
   const addNote = async (content: string) => {
     setIsClassifying(true);
     try {
-      const category = await categorizeContent(content);
+      // 입력 검증
+      const validation = validateNoteContent(content);
+      if (!validation.isValid) {
+        toast({
+          title: "입력 오류",
+          description: validation.error || "유효하지 않은 입력입니다.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const sanitizedContent = validation.sanitized || content;
+      const category = await categorizeContent(sanitizedContent);
       const now = new Date();
       
       if (currentNote) {
         // 기존 노트 수정
         const updatedNote = {
           ...currentNote,
-          content,
+          content: sanitizedContent,
           category,
           updatedAt: now
         };
@@ -154,14 +181,14 @@ export default function Home() {
           const updatedNotes = notes.map(note => 
             note.id === currentNote.id ? updatedNote : note
           );
-          localStorage.setItem('sticky-notes', JSON.stringify(updatedNotes));
+          localStorage.setItem(STORAGE_KEYS.STICKY_NOTES, JSON.stringify(updatedNotes));
           setNotes(updatedNotes);
         }
       } else {
         // 새 노트 추가
         const newNote: StickyNote = {
           id: crypto.randomUUID(),
-          content,
+          content: sanitizedContent,
           category,
           color: ['yellow', 'pink', 'blue', 'green'][Math.floor(Math.random() * 4)] as 'yellow' | 'pink' | 'blue' | 'green',
           createdAt: now,
@@ -176,10 +203,12 @@ export default function Home() {
       setCurrentNote(null);
       // 새 메모 작성 후에는 메모 모드 유지
     } catch (error) {
-      console.error('노트 추가/수정 실패:', error);
+      const appError = normalizeError(error);
+      logError(appError, { context: '노트 추가/수정' });
+      const userError = getUserFriendlyError(appError);
       toast({
-        title: "저장 실패",
-        description: "다시 시도해주세요.",
+        title: userError.title,
+        description: userError.description,
         variant: "destructive",
       });
     } finally {
@@ -196,14 +225,16 @@ export default function Home() {
         setNotes(updatedNotes);
       } else {
         const updatedNotes = notes.filter(note => note.id !== id);
-        localStorage.setItem('sticky-notes', JSON.stringify(updatedNotes));
+        localStorage.setItem(STORAGE_KEYS.STICKY_NOTES, JSON.stringify(updatedNotes));
         setNotes(updatedNotes);
       }
     } catch (error) {
-      console.error('노트 삭제 실패:', error);
+      const appError = normalizeError(error);
+      logError(appError, { context: '노트 삭제', noteId: id });
+      const userError = getUserFriendlyError(appError);
       toast({
-        title: "삭제 실패",
-        description: "다시 시도해주세요.",
+        title: userError.title,
+        description: userError.description,
         variant: "destructive",
       });
     }
@@ -221,25 +252,27 @@ export default function Home() {
         updatedAt: new Date()
       };
 
-      if (isSupabaseConnected) {
-        await updateNoteInSupabase(updatedNote);
-        const updatedNotes = await fetchNotesFromSupabase();
-        setNotes(updatedNotes);
-      } else {
-        const updatedNotes = notes.map(note =>
-          note.id === id ? updatedNote : note
-        );
-        localStorage.setItem('sticky-notes', JSON.stringify(updatedNotes));
-        setNotes(updatedNotes);
+        if (isSupabaseConnected) {
+          await updateNoteInSupabase(updatedNote);
+          const updatedNotes = await fetchNotesFromSupabase();
+          setNotes(updatedNotes);
+        } else {
+          const updatedNotes = notes.map(note =>
+            note.id === id ? updatedNote : note
+          );
+          localStorage.setItem(STORAGE_KEYS.STICKY_NOTES, JSON.stringify(updatedNotes));
+          setNotes(updatedNotes);
+        }
+      } catch (error) {
+        const appError = normalizeError(error);
+        logError(appError, { context: '노트 완료 처리', noteId: id });
+        const userError = getUserFriendlyError(appError);
+        toast({
+          title: userError.title,
+          description: userError.description,
+          variant: "destructive",
+        });
       }
-    } catch (error) {
-      console.error('노트 완료 처리 실패:', error);
-      toast({
-        title: "상태 변경 실패",
-        description: "다시 시도해주세요.",
-        variant: "destructive",
-      });
-    }
   };
 
   if (isLoading) {

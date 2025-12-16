@@ -1,6 +1,8 @@
 import { supabase } from './supabase'
 import { StickyNote } from './types'
 import type { Database } from './database.types.js'
+import { normalizeDate } from './date-utils'
+import { STORAGE_KEYS } from './constants'
 
 // Supabase 테이블 타입 정의
 type Tables = Database['public']['Tables']
@@ -9,8 +11,7 @@ type StickyNoteRow = StickyNoteTable['Row']
 type StickyNoteInsert = StickyNoteTable['Insert']
 type StickyNoteUpdate = StickyNoteTable['Update']
 
-// LocalStorage 키
-const LOCAL_STORAGE_KEY = 'sticky-notes'
+// LocalStorage 키는 constants에서 가져옴
 
 /**
  * Supabase에서 모든 노트 가져오기
@@ -28,14 +29,14 @@ export async function fetchNotesFromSupabase(): Promise<StickyNote[]> {
       return []
     }
 
-    // 데이터베이스 형식을 앱 형식으로 변환
+    // 데이터베이스 형식을 앱 형식으로 변환 (날짜 정규화)
     return data.map(dbNote => ({
       id: dbNote.id,
       content: dbNote.content,
       category: dbNote.category,
       color: dbNote.color,
-      createdAt: new Date(dbNote.created_at),
-      updatedAt: new Date(dbNote.updated_at),
+      createdAt: normalizeDate(dbNote.created_at),
+      updatedAt: normalizeDate(dbNote.updated_at),
       isCompleted: dbNote.is_completed || false,
     }))
   } catch (error) {
@@ -141,7 +142,7 @@ export async function deleteNoteFromSupabase(noteId: string): Promise<boolean> {
 export async function migrateLocalStorageToSupabase(): Promise<boolean> {
   try {
     // LocalStorage에서 기존 데이터 읽기
-    const savedNotes = localStorage.getItem(LOCAL_STORAGE_KEY)
+    const savedNotes = localStorage.getItem(STORAGE_KEYS.STICKY_NOTES)
     if (!savedNotes) {
       console.log('마이그레이션할 LocalStorage 데이터 없음')
       return true
@@ -149,8 +150,8 @@ export async function migrateLocalStorageToSupabase(): Promise<boolean> {
 
     const localNotes: StickyNote[] = JSON.parse(savedNotes).map((note: StickyNote) => ({
       ...note,
-      createdAt: new Date(note.createdAt),
-      updatedAt: new Date(note.updatedAt),
+      createdAt: normalizeDate(note.createdAt),
+      updatedAt: normalizeDate(note.updatedAt),
     }))
 
     console.log(`LocalStorage에서 ${localNotes.length}개 노트 발견`)
@@ -166,8 +167,8 @@ export async function migrateLocalStorageToSupabase(): Promise<boolean> {
 
     // 마이그레이션 성공 시 LocalStorage 백업 후 삭제
     if (successCount === localNotes.length) {
-      localStorage.setItem(`${LOCAL_STORAGE_KEY}-backup`, savedNotes)
-      localStorage.removeItem(LOCAL_STORAGE_KEY)
+      localStorage.setItem(STORAGE_KEYS.STICKY_NOTES_BACKUP, savedNotes)
+      localStorage.removeItem(STORAGE_KEYS.STICKY_NOTES)
       console.log('LocalStorage 데이터 정리 완료 (백업 보관)')
     }
 

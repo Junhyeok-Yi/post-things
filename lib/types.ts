@@ -9,6 +9,51 @@ export interface StickyNote {
   isCompleted?: boolean; // To-Do 아이템의 완료 상태
 }
 
+/**
+ * 타입 가드 함수들
+ */
+
+/**
+ * 카테고리 타입 가드
+ * @param value - 검증할 값
+ * @returns 유효한 카테고리인지 여부
+ */
+export function isCategory(value: string): value is 'To-Do' | '메모' | '아이디어' {
+  return ['To-Do', '메모', '아이디어'].includes(value);
+}
+
+/**
+ * 색상 타입 가드
+ * @param value - 검증할 값
+ * @returns 유효한 색상인지 여부
+ */
+export function isColor(value: string): value is 'yellow' | 'pink' | 'blue' | 'green' {
+  return ['yellow', 'pink', 'blue', 'green'].includes(value);
+}
+
+/**
+ * StickyNote 타입 가드
+ * @param value - 검증할 값
+ * @returns 유효한 StickyNote인지 여부
+ */
+export function isStickyNote(value: unknown): value is StickyNote {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const note = value as Record<string, unknown>;
+
+  return (
+    typeof note.id === 'string' &&
+    typeof note.content === 'string' &&
+    isCategory(note.category as string) &&
+    isColor(note.color as string) &&
+    (note.createdAt instanceof Date || typeof note.createdAt === 'string') &&
+    (note.updatedAt instanceof Date || typeof note.updatedAt === 'string') &&
+    (note.isCompleted === undefined || typeof note.isCompleted === 'boolean')
+  );
+}
+
 // 뷰 모드 타입
 export type ViewMode = 'memo' | 'diagram';
 
