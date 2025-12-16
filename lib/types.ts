@@ -2,11 +2,14 @@
 export interface StickyNote {
   id: string;
   content: string;
-  category: 'To-Do' | '메모' | '아이디어';
+  category: 'To-Do' | '메모' | '아이디어' | '회의록';
   color: 'yellow' | 'pink' | 'blue' | 'green';
   createdAt: Date;
   updatedAt: Date;
   isCompleted?: boolean; // To-Do 아이템의 완료 상태
+  meetingId?: string; // 회의록 모드에서 작성된 메모의 회의 ID
+  userCorrectedCategory?: 'To-Do' | '메모' | '아이디어' | '회의록'; // 사용자가 수정한 카테고리 (파인튜닝용)
+  aiPredictedCategory?: 'To-Do' | '메모' | '아이디어' | '회의록'; // AI가 예측한 원본 카테고리
 }
 
 /**
@@ -14,12 +17,17 @@ export interface StickyNote {
  */
 
 /**
+ * 카테고리 타입 정의
+ */
+export type Category = 'To-Do' | '메모' | '아이디어' | '회의록';
+
+/**
  * 카테고리 타입 가드
  * @param value - 검증할 값
  * @returns 유효한 카테고리인지 여부
  */
-export function isCategory(value: string): value is 'To-Do' | '메모' | '아이디어' {
-  return ['To-Do', '메모', '아이디어'].includes(value);
+export function isCategory(value: string): value is Category {
+  return ['To-Do', '메모', '아이디어', '회의록'].includes(value);
 }
 
 /**
@@ -72,5 +80,14 @@ export interface GestureEvent {
   deltaY: number;
   direction: SwipeDirection;
   distance: number;
+}
+
+// 회의록 관련 타입
+export interface Meeting {
+  id: string;
+  title: string; // AI가 추출한 회의 제목
+  startTime: Date;
+  endTime?: Date;
+  noteIds: string[]; // 해당 회의에 속한 메모 ID들
 }
 

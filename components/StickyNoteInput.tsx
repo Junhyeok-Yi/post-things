@@ -1,19 +1,22 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { StickyNote } from '@/lib/types';
+import { StickyNote, Category } from '@/lib/types';
 import { getCategoryColor, categorizeForPreview } from '@/lib/ai-categorizer';
 import { useGestures } from '@/hooks/useGestures';
-import { Check, X, Brain } from 'lucide-react';
+import { Check, X, Brain, Edit2 } from 'lucide-react';
+import { STORAGE_KEYS } from '@/lib/constants';
+import { saveFinetuningData } from '@/lib/finetuning';
 
 interface StickyNoteInputProps {
-  onSave: (content: string) => void;
+  onSave: (content: string, category?: Category, meetingId?: string) => void;
   onDelete: (id: string) => void;
   onComplete: (id: string) => void; // 완료 처리 함수
   onSwitchToAffinity: () => void;
   currentNote: StickyNote | null;
   setCurrentNote: (note: StickyNote | null) => void;
   isClassifying?: boolean; // AI 분류 중 상태
+  onCategoryChange?: (noteId: string, newCategory: Category) => void; // 카테고리 변경 콜백
 }
 
 export default function StickyNoteInput({
@@ -23,11 +26,37 @@ export default function StickyNoteInput({
   onSwitchToAffinity,
   currentNote,
   setCurrentNote,
-  isClassifying = false
+  isClassifying = false,
+  onCategoryChange
 }: StickyNoteInputProps) {
   const [content, setContent] = useState('');
   const [isEditing, setIsEditing] = useState(true);
   const [feedback, setFeedback] = useState<'save' | 'delete' | 'classifying' | null>(null);
+  
+  // 회의록 모드 상태 관리
+  const [isMeetingMode, setIsMeetingMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem(STORAGE_KEYS.MEETING_MODE) === 'true';
+    }
+    return false;
+  });
+  
+  // 현재 회의 ID 관리
+  const [currentMeetingId, setCurrentMeetingId] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem(STORAGE_KEYS.CURRENT_MEETING_ID);
+    }
+    return null;
+  });
+  
+  // AI 예측 카테고리 (실시간 미리보기용)
+  const [aiPredictedCategory, setAiPredictedCategory] = useState<Category | null>(null);
+  
+  // 사용자가 수정한 카테고리
+  const [userSelectedCategory, setUserSelectedCategory] = useState<Category | null>(null);
+  
+  // 카테고리 수정 모드
+  const [isEditingCategory, setIsEditingCategory] = useState(false);
   // 초기 색상을 currentNote에 따라 즉시 결정
   const getInitialColor = () => {
     if (currentNote) {
@@ -115,11 +144,37 @@ export default function StickyNoteInput({
     }
   }, [content, isMounted]);
 
+  // 회의록 모드 상태 저장
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(STORAGE_KEYS.MEETING_MODE, isMeetingMode.toString());
+      
+      // 회의록 모드가 꺼지면 현재 회의 ID 초기화
+      if (!isMeetingMode) {
+        setCurrentMeetingId(null);
+        localStorage.removeItem(STORAGE_KEYS.CURRENT_MEETING_ID);
+      } else if (!currentMeetingId) {
+        // 회의록 모드가 켜지고 회의 ID가 없으면 새로 생성
+        const newMeetingId = crypto.randomUUID();
+        setCurrentMeetingId(newMeetingId);
+        localStorage.setItem(STORAGE_KEYS.CURRENT_MEETING_ID, newMeetingId);
+      }
+    }
+  }, [isMeetingMode, currentMeetingId]);
+
   // 🎨 실시간 색상 미리보기 (통합 분류 시스템 사용) - 새 메모일 때만
   useEffect(() => {
     if (content.trim() && isMounted && !currentNote) {
+      // 회의록 모드면 무조건 회의록 카테고리
+      if (isMeetingMode) {
+        setAiPredictedCategory('회의록');
+        setStickyColor('bg-green-200');
+        return;
+      }
+      
       // 🚀 새로운 통합 분류 시스템 사용 (일관성 보장)
       const previewCategory = categorizeForPreview(content);
+      setAiPredictedCategory(previewCategory);
       
       const previewColor = getCategoryColor(previewCategory);
       const colorMap = {
@@ -132,9 +187,10 @@ export default function StickyNoteInput({
       setStickyColor(colorMap[previewColor]);
     } else if (!content.trim() && !currentNote) {
       // 빈 내용이면 기본 노란색 (새 메모일 때만)
+      setAiPredictedCategory(null);
       setStickyColor('bg-yellow-200');
     }
-  }, [content, isMounted, currentNote]);
+  }, [content, isMounted, currentNote, isMeetingMode]);
 
   // 편집 모드일 때 포커스 및 키보드 활성화
   useEffect(() => {
@@ -148,6 +204,8 @@ export default function StickyNoteInput({
     if (currentNote) {
       setContent(currentNote.content);
       setIsEditing(true);
+      setUserSelectedCategory(currentNote.category);
+      setAiPredictedCategory(currentNote.aiPredictedCategory || null);
       // 기존 노트의 색상을 즉시 설정 (깜빡임 방지)
       const colorMap = {
         yellow: 'bg-yellow-200',
@@ -160,6 +218,8 @@ export default function StickyNoteInput({
     } else {
       setContent('');
       setIsEditing(true);
+      setUserSelectedCategory(null);
+      setAiPredictedCategory(null);
       // 새 메모는 기본 노란색으로 시작
       setStickyColor('bg-yellow-200');
     }
@@ -192,10 +252,59 @@ export default function StickyNoteInput({
   const handleSave = () => {
     if (content.trim() && !isClassifying) {
       setFeedback('classifying');
-      onSave(content.trim());
+      
+      // 회의록 모드면 회의록 카테고리로 저장
+      const finalCategory = isMeetingMode 
+        ? '회의록' as Category
+        : (userSelectedCategory || aiPredictedCategory || '메모' as Category);
+      
+      // 파인튜닝 데이터 저장 (사용자가 수정한 경우)
+      if (currentNote && userSelectedCategory && aiPredictedCategory && userSelectedCategory !== aiPredictedCategory) {
+        const finetuningNote: StickyNote = {
+          ...currentNote,
+          category: userSelectedCategory,
+          aiPredictedCategory,
+          userCorrectedCategory: userSelectedCategory,
+        };
+        saveFinetuningData(finetuningNote);
+      }
+      
+      onSave(content.trim(), finalCategory, isMeetingMode ? currentMeetingId || undefined : undefined);
       setContent('');
       setCurrentNote(null);
+      setUserSelectedCategory(null);
+      setAiPredictedCategory(null);
       setIsEditing(true);
+    }
+  };
+  
+  const handleCategoryChange = (newCategory: Category) => {
+    setUserSelectedCategory(newCategory);
+    setIsEditingCategory(false);
+    
+    // 색상 업데이트
+    const colorMap = {
+      yellow: 'bg-yellow-200',
+      pink: 'bg-pink-200',
+      blue: 'bg-blue-200',
+      green: 'bg-green-200'
+    };
+    setStickyColor(colorMap[getCategoryColor(newCategory)]);
+    
+    // 기존 노트인 경우 즉시 업데이트
+    if (currentNote && onCategoryChange) {
+      onCategoryChange(currentNote.id, newCategory);
+    }
+    
+    // 파인튜닝 데이터 저장
+    if (currentNote && aiPredictedCategory && newCategory !== aiPredictedCategory) {
+      const finetuningNote: StickyNote = {
+        ...currentNote,
+        category: newCategory,
+        aiPredictedCategory,
+        userCorrectedCategory: newCategory,
+      };
+      saveFinetuningData(finetuningNote);
     }
   };
 
@@ -429,8 +538,25 @@ export default function StickyNoteInput({
     );
   }
 
+  const categories: Category[] = ['To-Do', '메모', '아이디어', '회의록'];
+  const displayCategory = userSelectedCategory || aiPredictedCategory;
+
   return (
-    <div className="min-h-screen flex items-center justify-center p-5 bg-gray-50 overscroll-none">
+    <div className="min-h-screen flex flex-col items-center justify-center p-5 bg-gray-50 overscroll-none">
+      {/* 회의록 모드 체크박스 */}
+      <div className="mb-4 flex items-center gap-2">
+        <input
+          type="checkbox"
+          id="meeting-mode"
+          checked={isMeetingMode}
+          onChange={(e) => setIsMeetingMode(e.target.checked)}
+          className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
+        />
+        <label htmlFor="meeting-mode" className="text-sm font-medium text-gray-700 cursor-pointer">
+          회의록 모드
+        </label>
+      </div>
+
       <div
         ref={containerRef}
         className={`relative w-full max-w-sm aspect-square ${stickyColor} rounded-lg shadow-lg transform cursor-pointer touch-none ${
@@ -456,20 +582,62 @@ export default function StickyNoteInput({
           onChange={(e) => setContent(e.target.value.slice(0, 100))}
           onKeyDown={handleKeyDown}
           placeholder="메모를 입력하세요."
-          className={`w-full h-full p-3 pt-8 pb-8 bg-transparent border-none outline-none resize-none ${fontSize} text-gray-800 placeholder-gray-500 leading-relaxed touch-none transition-all duration-200`}
+          className={`w-full h-full p-3 pt-8 pb-16 bg-transparent border-none outline-none resize-none ${fontSize} text-gray-800 placeholder-gray-500 leading-relaxed touch-none transition-all duration-200`}
           maxLength={100}
           disabled={isClassifying}
         />
         
         {/* 글자 수 표시 */}
-        <div className="absolute bottom-1 right-2 text-xs text-gray-500">
+        <div className="absolute bottom-12 right-2 text-xs text-gray-500">
           {content.length}/100
         </div>
         
         {/* 안내 텍스트 - PC와 모바일 모두 지원 */}
-        <div className="absolute bottom-1 left-2 text-xs text-gray-500">
+        <div className="absolute bottom-12 left-2 text-xs text-gray-500">
           {isClassifying ? 'AI 분류 중...' : '↑완료 | ↓다이어그램 | ←→삭제'}
         </div>
+
+        {/* AI 태그 표시 영역 (포스트잇 아래) */}
+        {displayCategory && !isMeetingMode && (
+          <div className="absolute -bottom-8 left-0 right-0 flex items-center justify-center gap-2">
+            {isEditingCategory ? (
+              <div className="flex items-center gap-2 bg-white rounded-lg shadow-md p-2">
+                {categories.map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => handleCategoryChange(cat)}
+                    className={`px-3 py-1 text-xs rounded transition-colors ${
+                      (userSelectedCategory || aiPredictedCategory) === cat
+                        ? 'bg-blue-500 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+                <button
+                  onClick={() => setIsEditingCategory(false)}
+                  className="ml-2 text-gray-500 hover:text-gray-700"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-600 bg-white px-3 py-1 rounded shadow-sm">
+                  AI: {displayCategory}
+                </span>
+                <button
+                  onClick={() => setIsEditingCategory(true)}
+                  className="text-xs text-blue-600 hover:text-blue-800 bg-white px-2 py-1 rounded shadow-sm flex items-center gap-1"
+                >
+                  <Edit2 className="w-3 h-3" />
+                  수정
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* 피드백 아이콘 */}
         {feedback && (

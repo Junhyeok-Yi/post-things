@@ -106,8 +106,8 @@ export function isValidUUID(id: string): boolean {
  * @param category - 검증할 카테고리
  * @returns 유효한 카테고리인지 여부
  */
-export function isValidCategory(category: string): category is 'To-Do' | '메모' | '아이디어' {
-  return ['To-Do', '메모', '아이디어'].includes(category);
+export function isValidCategory(category: string): category is 'To-Do' | '메모' | '아이디어' | '회의록' {
+  return ['To-Do', '메모', '아이디어', '회의록'].includes(category);
 }
 
 /**

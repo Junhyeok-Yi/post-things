@@ -4,7 +4,7 @@
  */
 
 // 카테고리 타입 정의
-export type Category = 'To-Do' | '메모' | '아이디어';
+export type Category = 'To-Do' | '메모' | '아이디어' | '회의록';
 
 // 📝 강화된 To-Do 패턴 정의
 const TODO_PATTERNS = {
@@ -386,23 +386,25 @@ export async function categorizeContent(content: string): Promise<Category> {
 /**
  * 카테고리별 색상 반환
  */
-export function getCategoryColor(category: Category): 'yellow' | 'pink' | 'blue' | 'green' {
-  const colorMap = {
+export function getCategoryColor(category: Category | string): 'yellow' | 'pink' | 'blue' | 'green' {
+  const colorMap: Record<Category, 'yellow' | 'pink' | 'blue' | 'green'> = {
     'To-Do': 'pink',
     '아이디어': 'blue',
-    '메모': 'yellow'
+    '메모': 'yellow',
+    '회의록': 'green'
   };
-  return colorMap[category] as 'yellow' | 'pink' | 'blue' | 'green';
+  return colorMap[category as Category] || 'yellow';
 }
 
 /**
  * 카테고리 우선순위 반환 (정렬용)
  */
 export function getCategoryPriority(category: Category): number {
-  const priorityMap = {
+  const priorityMap: Record<Category, number> = {
     'To-Do': 1,
     '아이디어': 2,
-    '메모': 3
+    '메모': 3,
+    '회의록': 4
   };
   return priorityMap[category] || 99;
 }

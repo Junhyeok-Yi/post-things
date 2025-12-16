@@ -114,6 +114,7 @@ export const CATEGORY_COLOR_MAP = {
   'To-Do': 'pink',
   '아이디어': 'blue',
   '메모': 'yellow',
+  '회의록': 'green',
 } as const;
 
 /**
@@ -128,4 +129,13 @@ export const STORAGE_KEYS = {
   
   /** 사용자 토픽 패턴 저장 키 */
   USER_TOPIC_PATTERNS: 'user-topic-patterns',
+  
+  /** 파인튜닝 데이터 저장 키 */
+  FINETUNING_DATA: 'finetuning-data',
+  
+  /** 회의록 모드 상태 저장 키 */
+  MEETING_MODE: 'meeting-mode',
+  
+  /** 현재 회의 ID 저장 키 */
+  CURRENT_MEETING_ID: 'current-meeting-id',
 } as const;

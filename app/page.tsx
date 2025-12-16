@@ -19,6 +19,7 @@ import { normalizeDate } from '@/lib/date-utils';
 import { normalizeError, getUserFriendlyError, logError, isRecoverableError } from '@/lib/error-handler';
 import { validateNoteContent } from '@/lib/validation';
 import { STORAGE_KEYS } from '@/lib/constants';
+import { getCategoryColor } from '@/lib/ai-categorizer';
 
 export default function Home() {
   const [viewMode, setViewMode] = useState<ViewMode>('memo');
@@ -146,7 +147,7 @@ export default function Home() {
   };
 
   // 노트 추가/수정
-  const addNote = async (content: string) => {
+  const addNote = async (content: string, category?: StickyNote['category'], meetingId?: string) => {
     setIsClassifying(true);
     try {
       // 입력 검증
@@ -161,15 +162,20 @@ export default function Home() {
       }
 
       const sanitizedContent = validation.sanitized || content;
-      const category = await categorizeContent(sanitizedContent);
+      const finalCategory = category || await categorizeContent(sanitizedContent);
       const now = new Date();
+      
+      // AI 예측 카테고리 저장 (사용자가 수정하지 않은 경우)
+      const aiPredictedCategory = category ? undefined : finalCategory;
       
       if (currentNote) {
         // 기존 노트 수정
         const updatedNote = {
           ...currentNote,
           content: sanitizedContent,
-          category,
+          category: finalCategory,
+          meetingId: meetingId || currentNote.meetingId,
+          aiPredictedCategory: currentNote.aiPredictedCategory || aiPredictedCategory,
           updatedAt: now
         };
         
@@ -186,14 +192,17 @@ export default function Home() {
         }
       } else {
         // 새 노트 추가
+        const categoryColor = getCategoryColor(finalCategory);
         const newNote: StickyNote = {
           id: crypto.randomUUID(),
           content: sanitizedContent,
-          category,
-          color: ['yellow', 'pink', 'blue', 'green'][Math.floor(Math.random() * 4)] as 'yellow' | 'pink' | 'blue' | 'green',
+          category: finalCategory,
+          color: categoryColor,
           createdAt: now,
           updatedAt: now,
-          isCompleted: false
+          isCompleted: false,
+          meetingId: meetingId,
+          aiPredictedCategory: aiPredictedCategory,
         };
         
         const updatedNotes = [newNote, ...notes];
@@ -213,6 +222,43 @@ export default function Home() {
       });
     } finally {
       setIsClassifying(false);
+    }
+  };
+  
+  // 카테고리 변경 핸들러
+  const handleCategoryChange = async (noteId: string, newCategory: StickyNote['category']) => {
+    try {
+      const noteToUpdate = notes.find(note => note.id === noteId);
+      if (!noteToUpdate) return;
+
+      const updatedNote = {
+        ...noteToUpdate,
+        category: newCategory,
+        color: getCategoryColor(newCategory),
+        userCorrectedCategory: newCategory,
+        updatedAt: new Date()
+      };
+
+      if (isSupabaseConnected) {
+        await updateNoteInSupabase(updatedNote);
+        const updatedNotes = await fetchNotesFromSupabase();
+        setNotes(updatedNotes);
+      } else {
+        const updatedNotes = notes.map(note =>
+          note.id === noteId ? updatedNote : note
+        );
+        localStorage.setItem(STORAGE_KEYS.STICKY_NOTES, JSON.stringify(updatedNotes));
+        setNotes(updatedNotes);
+      }
+    } catch (error) {
+      const appError = normalizeError(error);
+      logError(appError, { context: '카테고리 변경', noteId });
+      const userError = getUserFriendlyError(appError);
+      toast({
+        title: userError.title,
+        description: userError.description,
+        variant: "destructive",
+      });
     }
   };
 
@@ -252,27 +298,62 @@ export default function Home() {
         updatedAt: new Date()
       };
 
-        if (isSupabaseConnected) {
-          await updateNoteInSupabase(updatedNote);
-          const updatedNotes = await fetchNotesFromSupabase();
-          setNotes(updatedNotes);
-        } else {
-          const updatedNotes = notes.map(note =>
-            note.id === id ? updatedNote : note
-          );
-          localStorage.setItem(STORAGE_KEYS.STICKY_NOTES, JSON.stringify(updatedNotes));
-          setNotes(updatedNotes);
-        }
-      } catch (error) {
-        const appError = normalizeError(error);
-        logError(appError, { context: '노트 완료 처리', noteId: id });
-        const userError = getUserFriendlyError(appError);
-        toast({
-          title: userError.title,
-          description: userError.description,
-          variant: "destructive",
-        });
+      if (isSupabaseConnected) {
+        await updateNoteInSupabase(updatedNote);
+        const updatedNotes = await fetchNotesFromSupabase();
+        setNotes(updatedNotes);
+      } else {
+        const updatedNotes = notes.map(note =>
+          note.id === id ? updatedNote : note
+        );
+        localStorage.setItem(STORAGE_KEYS.STICKY_NOTES, JSON.stringify(updatedNotes));
+        setNotes(updatedNotes);
       }
+    } catch (error) {
+      const appError = normalizeError(error);
+      logError(appError, { context: '노트 완료 처리', noteId: id });
+      const userError = getUserFriendlyError(appError);
+      toast({
+        title: userError.title,
+        description: userError.description,
+        variant: "destructive",
+      });
+    }
+  };
+  
+  // 노트 완료 취소 처리 (미완료로 변경)
+  const uncompleteNote = async (id: string) => {
+    try {
+      const noteToUpdate = notes.find(note => note.id === id);
+      if (!noteToUpdate) return;
+
+      const updatedNote = {
+        ...noteToUpdate,
+        isCompleted: false,
+        updatedAt: new Date()
+      };
+
+      if (isSupabaseConnected) {
+        await updateNoteInSupabase(updatedNote);
+        const updatedNotes = await fetchNotesFromSupabase();
+        setNotes(updatedNotes);
+      } else {
+        const updatedNotes = notes.map(note =>
+          note.id === id ? updatedNote : note
+        );
+        localStorage.setItem(STORAGE_KEYS.STICKY_NOTES, JSON.stringify(updatedNotes));
+        setNotes(updatedNotes);
+      }
+    } catch (error) {
+      const appError = normalizeError(error);
+      logError(appError, { context: '노트 완료 취소', noteId: id });
+      const userError = getUserFriendlyError(appError);
+      toast({
+        title: userError.title,
+        description: userError.description,
+        variant: "destructive",
+      });
+    }
   };
 
   if (isLoading) {
@@ -294,6 +375,7 @@ export default function Home() {
           onSwitchToAffinity={() => setViewMode('diagram')}
           onComplete={toggleNoteCompletion}
           isClassifying={isClassifying}
+          onCategoryChange={handleCategoryChange}
         />
       ) : (
         <AffinityDiagram
@@ -302,6 +384,7 @@ export default function Home() {
           onSwitchToMemo={() => setViewMode('memo')}
           onNoteComplete={toggleNoteCompletion}
           onNoteDelete={deleteNote}
+          onNoteUncomplete={uncompleteNote}
         />
       )}
       

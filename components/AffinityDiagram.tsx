@@ -3,11 +3,11 @@
 import { useState, useEffect } from 'react';
 import { StickyNote } from '@/lib/types';
 import { getCategoryPriority } from '@/lib/ai-categorizer';
-import { classifyTopicSmart } from '@/lib/smart-topic-extractor';
-import { Edit3, Clock, Grid, Tag, MoreVertical, Check, Trash2, X } from 'lucide-react';
+import { Edit3, Clock, Tag, MoreVertical, Check, Trash2, X, RotateCcw } from 'lucide-react';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { normalizeDate } from '@/lib/date-utils';
+import { groupMeetings, extractMeetingTitle } from '@/lib/meeting-utils';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,7 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-type SortType = 'category' | 'topic' | 'time';
+type SortType = 'category' | 'meeting' | 'time';
 
 interface AffinityDiagramProps {
   notes: StickyNote[];
@@ -23,6 +23,7 @@ interface AffinityDiagramProps {
   onSwitchToMemo: () => void;
   onNoteComplete: (id: string) => void;
   onNoteDelete: (id: string) => void;
+  onNoteUncomplete?: (id: string) => void; // 완료 취소 함수 추가
 }
 
 export default function AffinityDiagram({
@@ -30,10 +31,12 @@ export default function AffinityDiagram({
   onNoteSelect,
   onSwitchToMemo,
   onNoteComplete,
-  onNoteDelete
+  onNoteDelete,
+  onNoteUncomplete
 }: AffinityDiagramProps) {
   const [sortType, setSortType] = useState<SortType>('category');
-  const [actionFeedback, setActionFeedback] = useState<{ [key: string]: 'complete' | 'delete' | null }>({});
+  const [actionFeedback, setActionFeedback] = useState<{ [key: string]: 'complete' | 'delete' | 'uncomplete' | null }>({});
+  const [hoveredNoteId, setHoveredNoteId] = useState<string | null>(null);
   
   const handleNoteClick = (note: StickyNote, e: React.MouseEvent<HTMLElement>) => {
     // 더보기 메뉴 클릭 시 이벤트 전파 중단
@@ -50,18 +53,6 @@ export default function AffinityDiagram({
     onSwitchToMemo();
   };
 
-  // 스마트 토픽 분류 테스트 (개발용)
-  useEffect(() => {
-    if (notes.length > 3 && process.env.NODE_ENV === 'development') {
-      // 개발 환경에서만 토픽 분류 성능 테스트
-      console.log('🧪 스마트 토픽 분류 테스트 실행');
-      import('@/lib/smart-topic-extractor').then(({ testSmartTopicExtractor }) => {
-        testSmartTopicExtractor();
-      });
-    }
-  }, [notes.length]);
-
-
   // 완료 처리 with 피드백
   const handleComplete = (noteId: string, e?: React.MouseEvent) => {
     if (e) {
@@ -75,6 +66,28 @@ export default function AffinityDiagram({
     // 실제 완료 처리
     setTimeout(() => {
       onNoteComplete(noteId);
+      // 피드백 제거
+      setTimeout(() => {
+        setActionFeedback(prev => ({ ...prev, [noteId]: null }));
+      }, 500);
+    }, 300);
+  };
+  
+  // 완료 취소 처리 with 피드백
+  const handleUncomplete = (noteId: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    
+    if (!onNoteUncomplete) return;
+    
+    // 피드백 표시
+    setActionFeedback(prev => ({ ...prev, [noteId]: 'uncomplete' }));
+    
+    // 실제 완료 취소 처리
+    setTimeout(() => {
+      onNoteUncomplete(noteId);
       // 피드백 제거
       setTimeout(() => {
         setActionFeedback(prev => ({ ...prev, [noteId]: null }));
@@ -102,31 +115,19 @@ export default function AffinityDiagram({
     }, 300);
   };
 
-  // 스마트 토픽 추출 (컨텍스트 + 개인 패턴 기반)
-  const extractTopic = (content: string): string => {
-    // 새로운 스마트 토픽 분류기 사용
-    const result = classifyTopicSmart(content, notes);
-    return result.topic;
-  };
-
-  // 주제별 그룹화 함수 (스마트 토픽 분류 적용)
-  const groupByTopic = (notes: StickyNote[]) => {
-    return notes.reduce((acc, note) => {
-      const topic = extractTopic(note.content);
-      
-      // 개발 환경에서 토픽 분류 과정 디버깅
-      if (process.env.NODE_ENV === 'development' && Math.random() < 0.1) { // 10% 확률로 디버깅
-        import('@/lib/smart-topic-extractor').then(({ debugTopicClassification }) => {
-          debugTopicClassification(note.content, notes);
-        });
+  // 회의록별 그룹화 함수
+  const groupByMeeting = (notes: StickyNote[]) => {
+    const meetings = groupMeetings(notes);
+    const groupedByMeeting: Record<string, StickyNote[]> = {};
+    
+    meetings.forEach(meeting => {
+      const meetingNotes = notes.filter(note => meeting.noteIds.includes(note.id));
+      if (meetingNotes.length > 0) {
+        groupedByMeeting[meeting.id] = meetingNotes;
       }
-      
-      if (!acc[topic]) {
-        acc[topic] = [];
-      }
-      acc[topic].push(note);
-      return acc;
-    }, {} as Record<string, StickyNote[]>);
+    });
+    
+    return groupedByMeeting;
   };
 
 
@@ -169,22 +170,23 @@ export default function AffinityDiagram({
       case 'category':
         const groupedByCategory = groupByCategory(notes);
         const sortedCategories = Object.keys(groupedByCategory).sort((a, b) => {
-          return getCategoryPriority(a as 'To-Do' | '메모' | '아이디어') - getCategoryPriority(b as 'To-Do' | '메모' | '아이디어');
+          return getCategoryPriority(a as StickyNote['category']) - getCategoryPriority(b as StickyNote['category']);
         });
-        return { groups: sortedCategories, groupedNotes: groupedByCategory, isTimeline: false };
+        return { groups: sortedCategories, groupedNotes: groupedByCategory, isTimeline: false, isMeeting: false };
       
-      case 'topic':
-        const groupedByTopic = groupByTopic(notes);
-        const sortedTopics = Object.keys(groupedByTopic).sort();
-        return { groups: sortedTopics, groupedNotes: groupedByTopic, isTimeline: false };
+      case 'meeting':
+        const groupedByMeeting = groupByMeeting(notes);
+        const meetings = groupMeetings(notes);
+        const meetingGroups = meetings.map(m => m.id);
+        return { groups: meetingGroups, groupedNotes: groupedByMeeting, isTimeline: false, isMeeting: true, meetings };
       
       case 'time':
         const { groupedByDate } = sortByTime(notes);
         const sortedDates = Object.keys(groupedByDate).sort().reverse();
-        return { groups: sortedDates, groupedNotes: groupedByDate, isTimeline: true };
+        return { groups: sortedDates, groupedNotes: groupedByDate, isTimeline: true, isMeeting: false };
       
       default:
-        return { groups: [], groupedNotes: {}, isTimeline: false };
+        return { groups: [], groupedNotes: {}, isTimeline: false, isMeeting: false };
     }
   };
 
@@ -203,6 +205,12 @@ export default function AffinityDiagram({
           badgeColor: 'bg-blue-50 text-blue-700 border-blue-200',
           completedColor: 'bg-green-50 text-green-700 border-green-200'
         };
+      case '회의록':
+        return {
+          accent: 'text-green-600',
+          badgeColor: 'bg-green-50 text-green-700 border-green-200',
+          completedColor: 'bg-green-50 text-green-700 border-green-200'
+        };
       default:
         return {
           accent: 'text-amber-600',
@@ -212,7 +220,7 @@ export default function AffinityDiagram({
     }
   };
 
-  const { groups, groupedNotes, isTimeline } = getSortedNotesAndGroups();
+  const { groups, groupedNotes, isTimeline, isMeeting, meetings } = getSortedNotesAndGroups();
 
   return (
     <div className="min-h-screen bg-white text-gray-900 relative">
@@ -244,15 +252,15 @@ export default function AffinityDiagram({
               Categories
             </button>
             <button
-              onClick={() => setSortType('topic')}
+              onClick={() => setSortType('meeting')}
               className={`flex items-center gap-2 px-6 py-3 rounded-md transition-all text-sm font-medium ${
-                sortType === 'topic'
+                sortType === 'meeting'
                   ? 'bg-white text-gray-900 shadow-sm'
                   : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
               }`}
             >
-              <Grid size={16} />
-              Topics
+              <Clock size={16} />
+              회의록
             </button>
             <button
               onClick={() => setSortType('time')}
@@ -286,12 +294,23 @@ export default function AffinityDiagram({
           </div>
         </div>
       ) : (
-        <main className="max-w-7xl mx-auto px-6 py-8">
+        <main className="max-w-[1920px] mx-auto px-6 py-8">
           {groups.map((group) => {
             const groupNotes = groupedNotes[group];
             // 완료되지 않은 노트만 카운트
             const activeCount = groupNotes.filter(note => !note.isCompleted).length;
             const completedCount = groupNotes.filter(note => note.isCompleted).length;
+            
+            // 회의록인 경우 제목 추출
+            let meetingTitle = '';
+            let meetingDate = '';
+            if (isMeeting && meetings) {
+              const meeting = meetings.find(m => m.id === group);
+              if (meeting) {
+                meetingTitle = meeting.title;
+                meetingDate = format(meeting.startTime, 'M월 d일 HH:mm', { locale: ko });
+              }
+            }
             
             return (
               <section key={group} className="mb-16">
@@ -302,6 +321,18 @@ export default function AffinityDiagram({
                       <h2 className="text-3xl font-bold text-gray-900">
                         {format(new Date(group), 'M월 d일 (E)', { locale: ko })}
                       </h2>
+                    ) : isMeeting ? (
+                      <>
+                        <div>
+                          <h2 className={`text-3xl font-bold ${getTheme('회의록').accent}`}>{meetingTitle || '회의록'}</h2>
+                          <p className="text-sm text-gray-500 mt-1">{meetingDate}</p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className={`px-4 py-2 rounded-full text-sm font-medium border ${getTheme('회의록').badgeColor}`}>
+                            {groupNotes.length} items
+                          </span>
+                        </div>
+                      </>
                     ) : (
                       <>
                         <h2 className={`text-3xl font-bold ${getTheme(group).accent}`}>{group}</h2>
@@ -310,9 +341,23 @@ export default function AffinityDiagram({
                             {activeCount} items
                           </span>
                           {group === 'To-Do' && completedCount > 0 && (
-                            <span className={`px-3 py-2 rounded-full text-sm font-medium border ${getTheme(group).completedColor}`}>
-                              {completedCount} completed
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className={`px-3 py-2 rounded-full text-sm font-medium border ${getTheme(group).completedColor}`}>
+                                {completedCount} completed
+                              </span>
+                              {/* 막대 그래프 */}
+                              <div className="flex items-center gap-1">
+                                <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                  <div 
+                                    className="h-full bg-green-500 transition-all duration-300"
+                                    style={{ width: `${(completedCount / (activeCount + completedCount)) * 100}%` }}
+                                  />
+                                </div>
+                                <span className="text-xs text-gray-500">
+                                  {Math.round((completedCount / (activeCount + completedCount)) * 100)}%
+                                </span>
+                              </div>
+                            </div>
                           )}
                         </div>
                       </>
@@ -320,12 +365,14 @@ export default function AffinityDiagram({
                   </div>
                 </div>
                 
-                {/* 🖼️ M2Z1 스타일 갤러리 그리드 */}
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
+                {/* 🖼️ M2Z1 스타일 갤러리 그리드 - 최대 4개 가로 배치 */}
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                   {groupNotes.map((note) => (
                     <div
                       key={note.id}
                       onClick={(e) => handleNoteClick(note, e)}
+                      onMouseEnter={() => setHoveredNoteId(note.id)}
+                      onMouseLeave={() => setHoveredNoteId(null)}
                       className="group relative aspect-square cursor-pointer transition-all duration-300 hover:scale-105"
                     >
                       {/* M2Z1 스타일 메모 카드 */}
@@ -351,10 +398,15 @@ export default function AffinityDiagram({
                               </button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-32">
-                              {!note.isCompleted && (
+                              {!note.isCompleted ? (
                                 <DropdownMenuItem onClick={(e) => handleComplete(note.id, e)}>
                                   <Check className="w-4 h-4 mr-2" />
                                   <span>완료</span>
+                                </DropdownMenuItem>
+                              ) : (
+                                <DropdownMenuItem onClick={(e) => handleUncomplete(note.id, e)}>
+                                  <RotateCcw className="w-4 h-4 mr-2" />
+                                  <span>미완료</span>
                                 </DropdownMenuItem>
                               )}
                               <DropdownMenuItem onClick={(e) => handleDelete(note.id, e)}>
@@ -370,9 +422,11 @@ export default function AffinityDiagram({
                         
                           {/* 메모 내용 영역 */}
                           <div className="relative h-full flex flex-col justify-between p-6 pt-8">
-                          {/* 메모 텍스트 */}
+                          {/* 메모 텍스트 - 말줄임 처리 */}
                           <div className="flex-1 flex items-center justify-center">
-                            <p className="text-gray-800 text-center leading-relaxed font-medium text-sm">
+                            <p className={`text-gray-800 text-center leading-relaxed font-medium text-sm ${
+                              hoveredNoteId === note.id && note.isCompleted ? '' : 'line-clamp-3'
+                            }`}>
                               {note.content}
                             </p>
                           </div>
@@ -388,13 +442,19 @@ export default function AffinityDiagram({
                           </div>
                         </div>
 
-                        {/* 완료 오버레이 (M2Z1 스타일) */}
+                        {/* 완료 오버레이 (M2Z1 스타일) - hover 시 내용 보이기 */}
                         {note.isCompleted && (
-                          <div className="absolute inset-0 bg-black/60 rounded-2xl flex items-center justify-center z-10 backdrop-blur-sm">
-                            <div className="text-center">
-                              <Check className="w-8 h-8 text-green-400 mx-auto mb-2" />
-                              <span className="text-white font-bold text-sm">완료됨</span>
-                            </div>
+                          <div className={`absolute inset-0 rounded-2xl flex items-center justify-center z-10 backdrop-blur-sm transition-all duration-300 ${
+                            hoveredNoteId === note.id 
+                              ? 'bg-black/20' 
+                              : 'bg-black/60'
+                          }`}>
+                            {hoveredNoteId !== note.id && (
+                              <div className="text-center">
+                                <Check className="w-8 h-8 text-green-400 mx-auto mb-2" />
+                                <span className="text-white font-bold text-sm">완료됨</span>
+                              </div>
+                            )}
                           </div>
                         )}
 
@@ -404,6 +464,8 @@ export default function AffinityDiagram({
                             <div className="bg-white/90 rounded-full p-4 shadow-lg">
                               {actionFeedback[note.id] === 'complete' ? (
                                 <Check className="w-6 h-6 text-green-600" />
+                              ) : actionFeedback[note.id] === 'uncomplete' ? (
+                                <RotateCcw className="w-6 h-6 text-blue-600" />
                               ) : (
                                 <X className="w-6 h-6 text-red-600" />
                               )}
@@ -424,7 +486,7 @@ export default function AffinityDiagram({
                     <p className="text-gray-600 text-lg">
                       이 {
                         sortType === 'category' ? '카테고리' : 
-                        sortType === 'topic' ? '주제' : '날짜'
+                        sortType === 'meeting' ? '회의록' : '날짜'
                       }에는 아직 메모가 없습니다.
                     </p>
                   </div>
