@@ -213,6 +213,88 @@ export default function AffinityDiagram({
 
   const { groups, groupedNotes, isTimeline } = getSortedNotesAndGroups();
 
+  const renderNoteCard = (note: StickyNote, group: string, mobile = false) => (
+    <div
+      key={note.id}
+      onClick={(e) => handleNoteClick(note, e)}
+      className={`group relative aspect-square cursor-pointer transition-all duration-300 ${mobile ? 'snap-center shrink-0 w-[78vw] max-w-[340px]' : 'hover:scale-105'}`}
+    >
+      <div className={`relative w-full h-full rounded-2xl shadow-lg transition-all duration-300 ${
+        note.color === 'yellow' ? 'bg-gradient-to-br from-yellow-200 to-yellow-300' :
+        note.color === 'pink' ? 'bg-gradient-to-br from-pink-200 to-pink-300' :
+        note.color === 'blue' ? 'bg-gradient-to-br from-blue-200 to-blue-300' :
+        'bg-gradient-to-br from-green-200 to-green-300'
+      } ${mobile ? '' : 'group-hover:shadow-2xl'}`}>
+
+        <div className="absolute top-2 right-2 z-50 more-menu">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className="p-2 text-gray-600 hover:text-gray-800 transition-colors hover:bg-white/80 rounded-full shadow-sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                }}
+              >
+                <MoreVertical className="w-4 h-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-32">
+              {!note.isCompleted && (
+                <DropdownMenuItem onClick={(e) => handleComplete(note.id, e)}>
+                  <Check className="w-4 h-4 mr-2" />
+                  <span>완료</span>
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem onClick={(e) => handleDelete(note.id, e)}>
+                <Trash2 className="w-4 h-4 mr-2" />
+                <span>삭제</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-12 h-3 bg-yellow-400/40 rounded-b-lg"></div>
+
+        <div className="relative h-full flex flex-col justify-between p-6 pt-8">
+          <div className="flex-1 flex items-center justify-center">
+            <p className="text-gray-800 text-center leading-relaxed font-medium text-sm">
+              {note.content}
+            </p>
+          </div>
+
+          <div className="flex items-center justify-between pt-4 border-t border-black/10">
+            <span className="text-xs text-gray-600 font-medium">{group}</span>
+            <span className="text-xs text-gray-500">
+              {format(note.createdAt instanceof Date ? note.createdAt : new Date(note.createdAt), 'MM.dd', { locale: ko })}
+            </span>
+          </div>
+        </div>
+
+        {note.isCompleted && (
+          <div className="absolute inset-0 bg-black/60 rounded-2xl flex items-center justify-center z-10 backdrop-blur-sm">
+            <div className="text-center">
+              <Check className="w-8 h-8 text-green-400 mx-auto mb-2" />
+              <span className="text-white font-bold text-sm">완료됨</span>
+            </div>
+          </div>
+        )}
+
+        {actionFeedback[note.id] && (
+          <div className="absolute inset-0 bg-black/40 rounded-2xl flex items-center justify-center z-30 backdrop-blur-sm">
+            <div className="bg-white/90 rounded-full p-4 shadow-lg">
+              {actionFeedback[note.id] === 'complete' ? (
+                <Check className="w-6 h-6 text-green-600" />
+              ) : (
+                <X className="w-6 h-6 text-red-600" />
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-white text-gray-900 relative">
       {/* 🎨 M2Z1 스타일 헤더 영역 (화이트 배경 최적화) */}
@@ -285,31 +367,29 @@ export default function AffinityDiagram({
           </div>
         </div>
       ) : (
-        <main className="max-w-7xl mx-auto px-6 py-8">
+        <main className="max-w-7xl mx-auto px-4 md:px-6 py-4 md:py-8 h-[calc(100vh-180px)] md:h-auto overflow-y-auto md:overflow-visible snap-y snap-mandatory md:snap-none touch-pan-y">
           {groups.map((group) => {
             const groupNotes = groupedNotes[group];
-            // 완료되지 않은 노트만 카운트
             const activeCount = groupNotes.filter(note => !note.isCompleted).length;
             const completedCount = groupNotes.filter(note => note.isCompleted).length;
-            
+
             return (
-              <section key={group} className="mb-16">
-                {/* 🎨 M2Z1 스타일 섹션 헤더 */}
-                <div className="flex items-center justify-between mb-8">
-                  <div className="flex items-center gap-4">
+              <section key={group} className="mb-8 md:mb-16 snap-start min-h-[calc(100vh-220px)] md:min-h-0">
+                <div className="flex items-center justify-between mb-4 md:mb-8">
+                  <div className="flex items-center gap-3 md:gap-4">
                     {isTimeline ? (
-                      <h2 className="text-3xl font-bold text-gray-900">
+                      <h2 className="text-2xl md:text-3xl font-bold text-gray-900">
                         {format(new Date(group), 'M월 d일 (E)', { locale: ko })}
                       </h2>
                     ) : (
                       <>
-                        <h2 className={`text-3xl font-bold ${getTheme(group).accent}`}>{group}</h2>
-                        <div className="flex items-center gap-3">
-                          <span className={`px-4 py-2 rounded-full text-sm font-medium border ${getTheme(group).badgeColor}`}>
+                        <h2 className={`text-2xl md:text-3xl font-bold ${getTheme(group).accent}`}>{group}</h2>
+                        <div className="flex items-center gap-2 md:gap-3">
+                          <span className={`px-3 md:px-4 py-1.5 md:py-2 rounded-full text-xs md:text-sm font-medium border ${getTheme(group).badgeColor}`}>
                             {activeCount} items
                           </span>
                           {group === 'To-Do' && completedCount > 0 && (
-                            <span className={`px-3 py-2 rounded-full text-sm font-medium border ${getTheme(group).completedColor}`}>
+                            <span className={`px-3 py-1.5 md:py-2 rounded-full text-xs md:text-sm font-medium border ${getTheme(group).completedColor}`}>
                               {completedCount} completed
                             </span>
                           )}
@@ -318,113 +398,24 @@ export default function AffinityDiagram({
                     )}
                   </div>
                 </div>
-                
-                {/* 🖼️ M2Z1 스타일 갤러리 그리드 */}
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
-                  {groupNotes.map((note) => (
-                    <div
-                      key={note.id}
-                      onClick={(e) => handleNoteClick(note, e)}
-                      className="group relative aspect-square cursor-pointer transition-all duration-300 hover:scale-105"
-                    >
-                      {/* M2Z1 스타일 메모 카드 */}
-                      <div className={`relative w-full h-full rounded-2xl shadow-lg transition-all duration-300 ${
-                        note.color === 'yellow' ? 'bg-gradient-to-br from-yellow-200 to-yellow-300' :
-                        note.color === 'pink' ? 'bg-gradient-to-br from-pink-200 to-pink-300' :
-                        note.color === 'blue' ? 'bg-gradient-to-br from-blue-200 to-blue-300' : 
-                        'bg-gradient-to-br from-green-200 to-green-300'
-                      } group-hover:shadow-2xl`}>
-                        
-                        {/* 더보기 아이콘 (항상 표시) */}
-                        <div className="absolute top-2 right-2 z-50 more-menu">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <button 
-                                className="p-2 text-gray-600 hover:text-gray-800 transition-colors hover:bg-white/80 rounded-full shadow-sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  e.preventDefault();
-                                }}
-                              >
-                                <MoreVertical className="w-4 h-4" />
-                              </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-32">
-                              {!note.isCompleted && (
-                                <DropdownMenuItem onClick={(e) => handleComplete(note.id, e)}>
-                                  <Check className="w-4 h-4 mr-2" />
-                                  <span>완료</span>
-                                </DropdownMenuItem>
-                              )}
-                              <DropdownMenuItem onClick={(e) => handleDelete(note.id, e)}>
-                                <Trash2 className="w-4 h-4 mr-2" />
-                                <span>삭제</span>
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
 
-                        {/* 포스트잇 접착 테이프 효과 */}
-                        <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-12 h-3 bg-yellow-400/40 rounded-b-lg"></div>
-                        
-                          {/* 메모 내용 영역 */}
-                          <div className="relative h-full flex flex-col justify-between p-6 pt-8">
-                          {/* 메모 텍스트 */}
-                          <div className="flex-1 flex items-center justify-center">
-                            <p className="text-gray-800 text-center leading-relaxed font-medium text-sm">
-                              {note.content}
-                            </p>
-                          </div>
-                          
-                          {/* 하단 메타데이터 */}
-                          <div className="flex items-center justify-between pt-4 border-t border-black/10">
-                            <span className="text-xs text-gray-600 font-medium">
-                              {group}
-                            </span>
-                            <span className="text-xs text-gray-500">
-                              {format(note.createdAt instanceof Date ? note.createdAt : new Date(note.createdAt), 'MM.dd', { locale: ko })}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* 완료 오버레이 (M2Z1 스타일) */}
-                        {note.isCompleted && (
-                          <div className="absolute inset-0 bg-black/60 rounded-2xl flex items-center justify-center z-10 backdrop-blur-sm">
-                            <div className="text-center">
-                              <Check className="w-8 h-8 text-green-400 mx-auto mb-2" />
-                              <span className="text-white font-bold text-sm">완료됨</span>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* 액션 피드백 오버레이 */}
-                        {actionFeedback[note.id] && (
-                          <div className="absolute inset-0 bg-black/40 rounded-2xl flex items-center justify-center z-30 backdrop-blur-sm">
-                            <div className="bg-white/90 rounded-full p-4 shadow-lg">
-                              {actionFeedback[note.id] === 'complete' ? (
-                                <Check className="w-6 h-6 text-green-600" />
-                              ) : (
-                                <X className="w-6 h-6 text-red-600" />
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                {/* Mobile: 1x1 horizontal snap lane */}
+                <div className="md:hidden flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory touch-pan-x">
+                  {groupNotes.map((note) => renderNoteCard(note, group, true))}
                 </div>
-                
-                {/* 빈 그룹 메시지 (라이트 모드) */}
+
+                {/* Desktop: existing grid */}
+                <div className="hidden md:grid grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
+                  {groupNotes.map((note) => renderNoteCard(note, group, false))}
+                </div>
+
                 {groupNotes.length === 0 && (
-                  <div className="text-center py-16">
+                  <div className="text-center py-12 md:py-16">
                     <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
                       <Grid className="w-8 h-8 text-gray-400" />
                     </div>
-                    <p className="text-gray-600 text-lg">
-                      이 {
-                        sortType === 'category' ? '카테고리' : 
-                        sortType === 'topic' ? '주제' : '날짜'
-                      }에는 아직 메모가 없습니다.
+                    <p className="text-gray-600 text-base md:text-lg">
+                      이 {sortType === 'category' ? '카테고리' : sortType === 'topic' ? '주제' : '날짜'}에는 아직 메모가 없습니다.
                     </p>
                   </div>
                 )}
