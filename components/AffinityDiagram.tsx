@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { StickyNote } from '@/lib/types';
 import { getCategoryPriority } from '@/lib/ai-categorizer';
 import { classifyTopicSmart } from '@/lib/smart-topic-extractor';
-import { Edit3, Clock, Grid, Tag, MoreVertical, Check, Trash2, X, RotateCcw } from 'lucide-react';
+import { Edit3, Grid, MoreVertical, Check, Trash2, X, RotateCcw } from 'lucide-react';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import {
@@ -294,11 +294,10 @@ export default function AffinityDiagram({
         </div>
 
         {note.isCompleted && (
-          <div className="absolute inset-0 bg-black/60 rounded-2xl flex items-center justify-center z-10 backdrop-blur-sm transition-all duration-200 group-hover:bg-black/40">
-            <div className="text-center px-4">
+          <div className="absolute inset-0 bg-black/60 rounded-2xl flex items-center justify-center z-10 backdrop-blur-sm transition-opacity duration-200 group-hover:opacity-0">
+            <div className="text-center">
               <Check className="w-8 h-8 text-green-400 mx-auto mb-2" />
-              <span className="text-white font-bold text-sm block mb-1">완료됨</span>
-              <p className="hidden md:block text-white/90 text-xs line-clamp-3">{note.content}</p>
+              <span className="text-white font-bold text-sm">완료됨</span>
             </div>
           </div>
         )}
@@ -322,46 +321,37 @@ export default function AffinityDiagram({
     <div className="min-h-screen bg-white text-gray-900 relative">
       {/* 🎨 M2Z1 스타일 헤더 영역 (화이트 배경 최적화) */}
       <header className="w-full border-b border-gray-200 bg-white">
-        <div className="max-w-7xl mx-auto px-6 py-8">
-          <div className="flex items-center justify-end mb-4 md:mb-8">
-            <div className="text-right">
-              <p className="text-xl md:text-2xl font-bold text-blue-600">{notes.length}</p>
-            </div>
-          </div>
-          
+        <div className="max-w-7xl mx-auto px-4 md:px-6 py-3 md:py-5">
           {/* 탭 네비게이션 */}
-          <nav className="flex gap-1 bg-gray-100 rounded-lg p-1 overflow-x-auto whitespace-nowrap">
+          <nav className="grid grid-cols-3 gap-1 bg-gray-100 rounded-lg p-1 w-full">
             <button
               onClick={() => setSortType('category')}
-              className={`shrink-0 flex items-center gap-2 px-3 md:px-6 py-2.5 md:py-3 rounded-md transition-all text-sm font-medium ${
+              className={`px-2 md:px-4 py-2.5 md:py-3 rounded-md transition-all text-sm font-medium text-center ${
                 sortType === 'category'
                   ? 'bg-white text-gray-900 shadow-sm'
                   : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
               }`}
             >
-              <Tag size={16} />
               Categories
             </button>
             <button
               onClick={() => setSortType('topic')}
-              className={`shrink-0 flex items-center gap-2 px-3 md:px-6 py-2.5 md:py-3 rounded-md transition-all text-sm font-medium ${
+              className={`px-2 md:px-4 py-2.5 md:py-3 rounded-md transition-all text-sm font-medium text-center ${
                 sortType === 'topic'
                   ? 'bg-white text-gray-900 shadow-sm'
                   : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
               }`}
             >
-              <Grid size={16} />
               Topics
             </button>
             <button
               onClick={() => setSortType('time')}
-              className={`shrink-0 flex items-center gap-2 px-3 md:px-6 py-2.5 md:py-3 rounded-md transition-all text-sm font-medium ${
+              className={`px-2 md:px-4 py-2.5 md:py-3 rounded-md transition-all text-sm font-medium text-center ${
                 sortType === 'time'
                   ? 'bg-white text-gray-900 shadow-sm'
                   : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
               }`}
             >
-              <Clock size={16} />
               Timeline
             </button>
           </nav>
@@ -385,14 +375,14 @@ export default function AffinityDiagram({
           </div>
         </div>
       ) : (
-        <main className="max-w-7xl mx-auto px-4 md:px-6 py-4 md:py-8 h-[calc(100vh-180px)] md:h-auto overflow-y-auto md:overflow-visible snap-y snap-proximity md:snap-none touch-pan-y">
+        <main className="max-w-7xl mx-auto px-4 md:px-6 py-3 md:py-6 h-[calc(100vh-140px)] md:h-auto overflow-y-auto md:overflow-visible snap-y snap-proximity md:snap-none touch-pan-y">
           {groups.map((group) => {
             const groupNotes = groupedNotes[group];
             const activeCount = groupNotes.filter(note => !note.isCompleted).length;
             const completedCount = groupNotes.filter(note => note.isCompleted).length;
 
             return (
-              <section key={group} className="mb-8 md:mb-16 snap-start">
+              <section key={group} className="mb-6 md:mb-12 snap-start">
                 <div className="flex items-center justify-between mb-4 md:mb-8">
                   <div className="flex items-center gap-3 md:gap-4">
                     {isTimeline ? (
