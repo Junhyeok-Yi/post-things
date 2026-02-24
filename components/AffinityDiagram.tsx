@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { StickyNote } from '@/lib/types';
 import { getCategoryPriority } from '@/lib/ai-categorizer';
 import { classifyTopicSmart } from '@/lib/smart-topic-extractor';
-import { Edit3, Clock, Grid, Tag, MoreVertical, Check, Trash2, X } from 'lucide-react';
+import { Edit3, Clock, Grid, Tag, MoreVertical, Check, Trash2, X, RotateCcw } from 'lucide-react';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import {
@@ -95,6 +95,23 @@ export default function AffinityDiagram({
     setTimeout(() => {
       onNoteDelete(noteId);
       // 피드백 제거
+      setTimeout(() => {
+        setActionFeedback(prev => ({ ...prev, [noteId]: null }));
+      }, 500);
+    }, 300);
+  };
+
+  // 완료 해제 (토글 재사용)
+  const handleUncomplete = (noteId: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+
+    setActionFeedback(prev => ({ ...prev, [noteId]: 'complete' }));
+
+    setTimeout(() => {
+      onNoteComplete(noteId);
       setTimeout(() => {
         setActionFeedback(prev => ({ ...prev, [noteId]: null }));
       }, 500);
@@ -239,11 +256,16 @@ export default function AffinityDiagram({
                 <MoreVertical className="w-4 h-4" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-32">
-              {!note.isCompleted && (
+            <DropdownMenuContent align="end" className="w-36">
+              {!note.isCompleted ? (
                 <DropdownMenuItem onClick={(e) => handleComplete(note.id, e)}>
                   <Check className="w-4 h-4 mr-2" />
                   <span>완료</span>
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem onClick={(e) => handleUncomplete(note.id, e)}>
+                  <RotateCcw className="w-4 h-4 mr-2" />
+                  <span>완료 해제</span>
                 </DropdownMenuItem>
               )}
               <DropdownMenuItem onClick={(e) => handleDelete(note.id, e)}>
@@ -272,10 +294,11 @@ export default function AffinityDiagram({
         </div>
 
         {note.isCompleted && (
-          <div className="absolute inset-0 bg-black/60 rounded-2xl flex items-center justify-center z-10 backdrop-blur-sm">
-            <div className="text-center">
+          <div className="absolute inset-0 bg-black/60 rounded-2xl flex items-center justify-center z-10 backdrop-blur-sm transition-all duration-200 group-hover:bg-black/40">
+            <div className="text-center px-4">
               <Check className="w-8 h-8 text-green-400 mx-auto mb-2" />
-              <span className="text-white font-bold text-sm">완료됨</span>
+              <span className="text-white font-bold text-sm block mb-1">완료됨</span>
+              <p className="hidden md:block text-white/90 text-xs line-clamp-3">{note.content}</p>
             </div>
           </div>
         )}
@@ -300,22 +323,17 @@ export default function AffinityDiagram({
       {/* 🎨 M2Z1 스타일 헤더 영역 (화이트 배경 최적화) */}
       <header className="w-full border-b border-gray-200 bg-white">
         <div className="max-w-7xl mx-auto px-6 py-8">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h1 className="text-4xl font-bold mb-2 text-gray-900">AI 메모 갤러리</h1>
-              <p className="text-gray-600 text-lg">스마트 분류로 정리된 당신의 생각들</p>
-            </div>
+          <div className="flex items-center justify-end mb-4 md:mb-8">
             <div className="text-right">
-              <p className="text-2xl font-bold text-blue-600">{notes.length}</p>
-              <p className="text-gray-500 text-sm">Total Memos</p>
+              <p className="text-xl md:text-2xl font-bold text-blue-600">{notes.length}</p>
             </div>
           </div>
           
-          {/* M2Z1 스타일 네비게이션 바 (라이트 모드) */}
-          <nav className="flex gap-1 bg-gray-100 rounded-lg p-1">
+          {/* 탭 네비게이션 */}
+          <nav className="flex gap-1 bg-gray-100 rounded-lg p-1 overflow-x-auto whitespace-nowrap">
             <button
               onClick={() => setSortType('category')}
-              className={`flex items-center gap-2 px-6 py-3 rounded-md transition-all text-sm font-medium ${
+              className={`shrink-0 flex items-center gap-2 px-3 md:px-6 py-2.5 md:py-3 rounded-md transition-all text-sm font-medium ${
                 sortType === 'category'
                   ? 'bg-white text-gray-900 shadow-sm'
                   : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
@@ -326,7 +344,7 @@ export default function AffinityDiagram({
             </button>
             <button
               onClick={() => setSortType('topic')}
-              className={`flex items-center gap-2 px-6 py-3 rounded-md transition-all text-sm font-medium ${
+              className={`shrink-0 flex items-center gap-2 px-3 md:px-6 py-2.5 md:py-3 rounded-md transition-all text-sm font-medium ${
                 sortType === 'topic'
                   ? 'bg-white text-gray-900 shadow-sm'
                   : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
@@ -337,7 +355,7 @@ export default function AffinityDiagram({
             </button>
             <button
               onClick={() => setSortType('time')}
-              className={`flex items-center gap-2 px-6 py-3 rounded-md transition-all text-sm font-medium ${
+              className={`shrink-0 flex items-center gap-2 px-3 md:px-6 py-2.5 md:py-3 rounded-md transition-all text-sm font-medium ${
                 sortType === 'time'
                   ? 'bg-white text-gray-900 shadow-sm'
                   : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
@@ -367,14 +385,14 @@ export default function AffinityDiagram({
           </div>
         </div>
       ) : (
-        <main className="max-w-7xl mx-auto px-4 md:px-6 py-4 md:py-8 h-[calc(100vh-180px)] md:h-auto overflow-y-auto md:overflow-visible snap-y snap-mandatory md:snap-none touch-pan-y">
+        <main className="max-w-7xl mx-auto px-4 md:px-6 py-4 md:py-8 h-[calc(100vh-180px)] md:h-auto overflow-y-auto md:overflow-visible snap-y snap-proximity md:snap-none touch-pan-y">
           {groups.map((group) => {
             const groupNotes = groupedNotes[group];
             const activeCount = groupNotes.filter(note => !note.isCompleted).length;
             const completedCount = groupNotes.filter(note => note.isCompleted).length;
 
             return (
-              <section key={group} className="mb-8 md:mb-16 snap-start min-h-[calc(100vh-220px)] md:min-h-0">
+              <section key={group} className="mb-8 md:mb-16 snap-start">
                 <div className="flex items-center justify-between mb-4 md:mb-8">
                   <div className="flex items-center gap-3 md:gap-4">
                     {isTimeline ? (
@@ -400,8 +418,11 @@ export default function AffinityDiagram({
                 </div>
 
                 {/* Mobile: 1x1 horizontal snap lane */}
-                <div className="md:hidden flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory touch-pan-x">
-                  {groupNotes.map((note) => renderNoteCard(note, group, true))}
+                <div className="md:hidden relative">
+                  <div className="flex gap-4 overflow-x-auto overflow-y-visible pb-4 pr-6 snap-x snap-mandatory touch-pan-x">
+                    {groupNotes.map((note) => renderNoteCard(note, group, true))}
+                  </div>
+                  <div className="pointer-events-none absolute right-0 top-0 h-full w-10 bg-gradient-to-l from-white to-transparent" />
                 </div>
 
                 {/* Desktop: existing grid */}

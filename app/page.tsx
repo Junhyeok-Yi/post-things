@@ -272,11 +272,11 @@ export default function Home() {
         />
       )}
       
-      {/* 🎨 M2Z1 스타일 동기화 상태 표시 (라이트 모드) */}
-      <div className="fixed top-6 right-6 z-30">
-        <div className="px-4 py-2 rounded-lg text-sm font-medium bg-white/90 backdrop-blur-sm border border-gray-200 flex items-center gap-3 shadow-lg">
-          <span className={`w-2 h-2 rounded-full ${isSupabaseConnected ? 'bg-green-500' : 'bg-amber-500'} animate-pulse`}></span>
-          <span className="text-gray-700">
+      {/* 동기화 상태 표시 */}
+      <div className="fixed top-4 right-4 md:top-6 md:right-6 z-30">
+        <div className="px-2.5 py-2 md:px-4 md:py-2 rounded-lg text-sm font-medium bg-white/90 backdrop-blur-sm border border-gray-200 flex items-center gap-2 md:gap-3 shadow-lg">
+          <span className={`w-2.5 h-2.5 rounded-full ${isSupabaseConnected ? 'bg-green-500' : 'bg-amber-500'} animate-pulse`}></span>
+          <span className="hidden md:inline text-gray-700">
             {isSupabaseConnected ? 'Cloud Sync' : 'Local Mode'}
           </span>
         </div>
