@@ -10,7 +10,7 @@ export interface StickyNote {
 }
 
 // 뷰 모드 타입
-export type ViewMode = 'memo' | 'diagram';
+export type ViewMode = 'memo' | 'diagram' | 'meeting';
 
 // 스와이프 방향 타입
 export type SwipeDirection = 'up' | 'left' | 'right' | 'down';

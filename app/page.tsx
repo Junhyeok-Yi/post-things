@@ -14,6 +14,7 @@ import {
 import { supabase } from '@/lib/supabase';
 import StickyNoteInput from '@/components/StickyNoteInput';
 import AffinityDiagram from '@/components/AffinityDiagram';
+import MeetingPanel from '@/components/MeetingPanel';
 import { useToast } from "@/hooks/use-toast";
 
 export default function Home() {
@@ -252,6 +253,27 @@ export default function Home() {
 
   return (
     <main className="min-h-screen">
+      <div className="fixed top-4 left-4 z-30 flex gap-2 rounded-lg border border-slate-200 bg-white/90 p-1 shadow backdrop-blur-sm">
+        <button
+          onClick={() => setViewMode('memo')}
+          className={`rounded-md px-3 py-1.5 text-sm font-medium ${viewMode === 'memo' ? 'bg-slate-900 text-white' : 'text-slate-700'}`}
+        >
+          Memo
+        </button>
+        <button
+          onClick={() => setViewMode('diagram')}
+          className={`rounded-md px-3 py-1.5 text-sm font-medium ${viewMode === 'diagram' ? 'bg-slate-900 text-white' : 'text-slate-700'}`}
+        >
+          Diagram
+        </button>
+        <button
+          onClick={() => setViewMode('meeting')}
+          className={`rounded-md px-3 py-1.5 text-sm font-medium ${viewMode === 'meeting' ? 'bg-slate-900 text-white' : 'text-slate-700'}`}
+        >
+          Meeting
+        </button>
+      </div>
+
       {viewMode === 'memo' ? (
         <StickyNoteInput
           currentNote={currentNote}
@@ -262,7 +284,7 @@ export default function Home() {
           onComplete={toggleNoteCompletion}
           isClassifying={isClassifying}
         />
-      ) : (
+      ) : viewMode === 'diagram' ? (
         <AffinityDiagram
           notes={notes}
           onNoteSelect={setCurrentNote}
@@ -270,8 +292,10 @@ export default function Home() {
           onNoteComplete={toggleNoteCompletion}
           onNoteDelete={deleteNote}
         />
+      ) : (
+        <MeetingPanel />
       )}
-      
+
       {/* 오프라인/로컬 모드에서만 표시 */}
       {!isSupabaseConnected && (
         <div className="fixed top-4 right-4 z-30">
