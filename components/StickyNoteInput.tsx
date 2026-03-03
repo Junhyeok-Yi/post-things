@@ -14,6 +14,9 @@ interface StickyNoteInputProps {
   currentNote: StickyNote | null;
   setCurrentNote: (note: StickyNote | null) => void;
   isClassifying?: boolean; // AI 분류 중 상태
+  meetingMode?: boolean;
+  meetingLabel?: string;
+  onToggleMeetingMode?: () => void;
 }
 
 export default function StickyNoteInput({
@@ -23,7 +26,10 @@ export default function StickyNoteInput({
   onSwitchToAffinity,
   currentNote,
   setCurrentNote,
-  isClassifying = false
+  isClassifying = false,
+  meetingMode = false,
+  meetingLabel = '활성 회의 없음',
+  onToggleMeetingMode,
 }: StickyNoteInputProps) {
   const [content, setContent] = useState('');
   const [isEditing, setIsEditing] = useState(true);
@@ -453,7 +459,21 @@ export default function StickyNoteInput({
       >
         {/* 포스트잇 상단 접착 부분 */}
         <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-16 h-4 bg-yellow-300 rounded-b-sm opacity-60"></div>
-        
+
+        {/* 회의모드 토글 (메모 우상단) */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onToggleMeetingMode?.();
+          }}
+          className={`absolute top-2 right-2 z-20 rounded-full px-2.5 py-1 text-[11px] font-semibold shadow-sm transition ${meetingMode ? 'bg-emerald-600 text-white' : 'bg-white/90 text-slate-700'}`}
+          title={meetingLabel}
+        >
+          회의 {meetingMode ? 'ON' : 'OFF'}
+        </button>
+
         {/* 텍스트 입력 영역 - 패딩 줄이고 전체 크기 활용 */}
         <textarea
           ref={textareaRef}
@@ -474,8 +494,8 @@ export default function StickyNoteInput({
         </div>
         
         {/* 안내 텍스트 - PC와 모바일 모두 지원 */}
-        <div className="absolute bottom-1 left-2 text-xs text-gray-500">
-          {isClassifying ? 'AI 분류 중...' : '↑완료 | ↓다이어그램 | ←→삭제'}
+        <div className="absolute bottom-1 left-2 text-[11px] text-gray-500">
+          {isClassifying ? 'AI 분류 중...' : `↑완료 | ↓다이어그램 | ←→삭제 | ${meetingMode ? '회의모드' : '일반모드'}`}
         </div>
 
         {/* 피드백 아이콘 */}

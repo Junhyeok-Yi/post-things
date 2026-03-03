@@ -14,8 +14,15 @@ import {
 import { supabase } from '@/lib/supabase';
 import StickyNoteInput from '@/components/StickyNoteInput';
 import AffinityDiagram from '@/components/AffinityDiagram';
-import MeetingPanel from '@/components/MeetingPanel';
 import { useToast } from "@/hooks/use-toast";
+
+type MeetingSession = {
+  id: string;
+  title: string;
+  status: 'active' | 'ended';
+  started_at: string;
+  ended_at: string | null;
+};
 
 export default function Home() {
   const [viewMode, setViewMode] = useState<ViewMode>('memo');
@@ -24,7 +31,65 @@ export default function Home() {
   const [isClassifying, setIsClassifying] = useState(false);
   const [isSupabaseConnected, setIsSupabaseConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [meetingMode, setMeetingMode] = useState(false);
+  const [activeMeeting, setActiveMeeting] = useState<MeetingSession | null>(null);
   const { toast } = useToast();
+
+  const fetchActiveMeeting = async () => {
+    try {
+      const res = await fetch('/api/meetings/active', { cache: 'no-store' });
+      const data = await res.json();
+      const session = data?.activeSession ?? null;
+      setActiveMeeting(session);
+      setMeetingMode(Boolean(session));
+    } catch (error) {
+      console.error('활성 회의 조회 실패:', error);
+    }
+  };
+
+  const startMeetingMode = async () => {
+    const title = `회의 ${new Date().toLocaleString()}`;
+    const res = await fetch('/api/meetings/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data?.error || '회의 시작 실패');
+    }
+    setActiveMeeting(data.session);
+    setMeetingMode(true);
+  };
+
+  const endMeetingMode = async () => {
+    if (!activeMeeting?.id) {
+      setMeetingMode(false);
+      return;
+    }
+    const res = await fetch(`/api/meetings/${activeMeeting.id}/end`, { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok && res.status !== 409) {
+      throw new Error(data?.error || '회의 종료 실패');
+    }
+    setActiveMeeting(null);
+    setMeetingMode(false);
+  };
+
+  const handleToggleMeetingMode = async () => {
+    try {
+      if (meetingMode) {
+        await endMeetingMode();
+        toast({ title: '회의 모드 OFF', description: '회의 모드를 종료했습니다.' });
+      } else {
+        await startMeetingMode();
+        toast({ title: '회의 모드 ON', description: '이제 작성한 메모는 현재 회의로 기록됩니다.' });
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '회의 모드 전환 실패';
+      toast({ title: '회의 모드 전환 실패', description: message, variant: 'destructive' });
+    }
+  };
 
   // 앱 초기화
   useEffect(() => {
@@ -42,6 +107,9 @@ export default function Home() {
           // Supabase에서 노트 가져오기
           const supabaseNotes = await fetchNotesFromSupabase();
           setNotes(supabaseNotes);
+
+          // 현재 활성 회의 상태 동기화
+          await fetchActiveMeeting();
         } else {
           // LocalStorage에서 노트 가져오기
           const savedNotes = localStorage.getItem('sticky-notes');
@@ -167,7 +235,8 @@ export default function Home() {
           color: ['yellow', 'pink', 'blue', 'green'][Math.floor(Math.random() * 4)] as 'yellow' | 'pink' | 'blue' | 'green',
           createdAt: now,
           updatedAt: now,
-          isCompleted: false
+          isCompleted: false,
+          meetingSessionId: meetingMode ? activeMeeting?.id ?? null : null,
         };
         
         const updatedNotes = [newNote, ...notes];
@@ -266,12 +335,6 @@ export default function Home() {
         >
           Diagram
         </button>
-        <button
-          onClick={() => setViewMode('meeting')}
-          className={`rounded-md px-3 py-1.5 text-sm font-medium ${viewMode === 'meeting' ? 'bg-slate-900 text-white' : 'text-slate-700'}`}
-        >
-          Meeting
-        </button>
       </div>
 
       {viewMode === 'memo' ? (
@@ -283,8 +346,11 @@ export default function Home() {
           onSwitchToAffinity={() => setViewMode('diagram')}
           onComplete={toggleNoteCompletion}
           isClassifying={isClassifying}
+          meetingMode={meetingMode}
+          meetingLabel={activeMeeting?.title ?? '활성 회의 없음'}
+          onToggleMeetingMode={handleToggleMeetingMode}
         />
-      ) : viewMode === 'diagram' ? (
+      ) : (
         <AffinityDiagram
           notes={notes}
           onNoteSelect={setCurrentNote}
@@ -292,8 +358,6 @@ export default function Home() {
           onNoteComplete={toggleNoteCompletion}
           onNoteDelete={deleteNote}
         />
-      ) : (
-        <MeetingPanel />
       )}
 
       {/* 오프라인/로컬 모드에서만 표시 */}

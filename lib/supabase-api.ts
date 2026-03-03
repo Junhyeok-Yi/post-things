@@ -8,6 +8,9 @@ type StickyNoteTable = Tables['sticky_notes']
 type StickyNoteRow = StickyNoteTable['Row']
 type StickyNoteInsert = StickyNoteTable['Insert']
 type StickyNoteUpdate = StickyNoteTable['Update']
+type StickyNoteRowExt = StickyNoteRow & { meeting_session_id?: string | null }
+type StickyNoteInsertExt = StickyNoteInsert & { meeting_session_id?: string | null }
+type StickyNoteUpdateExt = StickyNoteUpdate & { meeting_session_id?: string | null }
 
 // LocalStorage 키
 const LOCAL_STORAGE_KEY = 'sticky-notes'
@@ -37,6 +40,7 @@ export async function fetchNotesFromSupabase(): Promise<StickyNote[]> {
       createdAt: new Date(dbNote.created_at),
       updatedAt: new Date(dbNote.updated_at),
       isCompleted: dbNote.is_completed || false,
+      meetingSessionId: (dbNote as StickyNoteRowExt).meeting_session_id ?? null,
     }))
   } catch (error) {
     console.error('Supabase 연결 실패:', error)
@@ -60,9 +64,15 @@ export async function saveNoteToSupabase(note: StickyNote): Promise<boolean> {
       updated_at: note.updatedAt.toISOString(),
     }
 
+    // database.types.ts 미갱신 컬럼 반영
+    const insertPayload: StickyNoteInsertExt = { ...insertData }
+    if (note.meetingSessionId) {
+      insertPayload.meeting_session_id = note.meetingSessionId
+    }
+
     const { error } = await supabase
       .from('sticky_notes')
-      .insert([insertData])
+      .insert([insertPayload])
       .returns<StickyNoteRow[]>()
 
     if (error) {
@@ -92,9 +102,14 @@ export async function updateNoteInSupabase(note: StickyNote): Promise<boolean> {
       updated_at: note.updatedAt.toISOString(),
     }
 
+    const updatePayload: StickyNoteUpdateExt = { ...updateData }
+    if (note.meetingSessionId !== undefined) {
+      updatePayload.meeting_session_id = note.meetingSessionId
+    }
+
     const { error } = await supabase
       .from('sticky_notes')
-      .update(updateData)
+      .update(updatePayload)
       .eq('id', note.id)
       .returns<StickyNoteRow[]>()
 
