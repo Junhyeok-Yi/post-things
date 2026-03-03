@@ -7,6 +7,7 @@ export interface StickyNote {
   createdAt: Date;
   updatedAt: Date;
   isCompleted?: boolean; // To-Do 아이템의 완료 상태
+  meetingSessionId?: string | null; // 회의 모드에서 생성된 메모의 세션 ID
 }
 
 // 뷰 모드 타입
