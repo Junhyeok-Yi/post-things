@@ -35,24 +35,25 @@ export default function Home() {
   const [activeMeeting, setActiveMeeting] = useState<MeetingSession | null>(null);
   const { toast } = useToast();
 
-  const parseJsonSafe = async (res: Response) => {
+  const parseJsonSafe = async (res: Response): Promise<{ json: unknown; raw: string }> => {
     const raw = await res.text();
-    if (!raw) return null;
+    if (!raw) return { json: null, raw: '' };
     try {
-      return JSON.parse(raw);
+      return { json: JSON.parse(raw), raw };
     } catch {
-      return null;
+      return { json: null, raw };
     }
   };
 
   const fetchActiveMeeting = async () => {
     try {
       const res = await fetch('/api/meetings/active', { cache: 'no-store' });
-      const data = await parseJsonSafe(res);
+      const { json, raw } = await parseJsonSafe(res);
       if (!res.ok) {
-        throw new Error((data as { error?: string } | null)?.error || '활성 회의 조회 실패');
+        const msg = (json as { error?: string } | null)?.error || `활성 회의 조회 실패 (HTTP ${res.status})`;
+        throw new Error(`${msg}${raw ? ` | ${raw.slice(0, 120)}` : ''}`);
       }
-      const session = (data as { activeSession?: MeetingSession | null } | null)?.activeSession ?? null;
+      const session = (json as { activeSession?: MeetingSession | null } | null)?.activeSession ?? null;
       setActiveMeeting(session);
       setMeetingMode(Boolean(session));
     } catch (error) {
@@ -67,9 +68,11 @@ export default function Home() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title }),
     });
-    const data = await parseJsonSafe(res) as { error?: string; session?: MeetingSession } | null;
+    const { json, raw } = await parseJsonSafe(res);
+    const data = json as { error?: string; session?: MeetingSession } | null;
     if (!res.ok || !data?.session) {
-      throw new Error(data?.error || '회의 시작 실패');
+      const msg = data?.error || `회의 시작 실패 (HTTP ${res.status})`;
+      throw new Error(`${msg}${raw ? ` | ${raw.slice(0, 120)}` : ''}`);
     }
     setActiveMeeting(data.session);
     setMeetingMode(true);
@@ -81,9 +84,11 @@ export default function Home() {
       return;
     }
     const res = await fetch(`/api/meetings/${activeMeeting.id}/end`, { method: 'POST' });
-    const data = await parseJsonSafe(res) as { error?: string } | null;
+    const { json, raw } = await parseJsonSafe(res);
+    const data = json as { error?: string } | null;
     if (!res.ok && res.status !== 409) {
-      throw new Error(data?.error || '회의 종료 실패');
+      const msg = data?.error || `회의 종료 실패 (HTTP ${res.status})`;
+      throw new Error(`${msg}${raw ? ` | ${raw.slice(0, 120)}` : ''}`);
     }
     setActiveMeeting(null);
     setMeetingMode(false);
