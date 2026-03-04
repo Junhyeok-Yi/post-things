@@ -69,6 +69,7 @@ jobs:
           DETAILS_URL: ${{ github.event.check_run.details_url }}
           REPO: ${{ github.repository }}
           PRS_JSON: ${{ toJson(github.event.check_run.pull_requests) }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           echo "$CHECK_NAME" | grep -qi "vercel" || exit 0
 
@@ -82,6 +83,28 @@ jobs:
 
           STATE=$(echo "$CONCLUSION" | tr '[:lower:]' '[:upper:]')
 
+          # PR 코멘트에서 최신 Vercel Preview URL 추출
+          COMMENTS=$(curl -fsSL \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${REPO}/issues/${PR_NUMBER}/comments")
+
+          PREVIEW_URL=$(echo "$COMMENTS" | jq -r '
+            [ .[]
+              | select(.user.login == "vercel")
+              | .body
+              | capture("\\[Preview\\]\\((?<u>https://[^)]+)\\)")?.u
+            ]
+            | map(select(. != null))
+            | last // ""
+          ')
+
+          if [ -n "$PREVIEW_URL" ]; then
+            MSG="[${REPO}] PR #${PR_NUMBER} VERCEL ${STATE}\n${CHECK_NAME}\nPR: ${PR_URL}\nPreview: ${PREVIEW_URL}\nDetails: ${DETAILS_URL}"
+          else
+            MSG="[${REPO}] PR #${PR_NUMBER} VERCEL ${STATE}\n${CHECK_NAME}\nPR: ${PR_URL}\nDetails: ${DETAILS_URL}"
+          fi
+
           curl -sS -X POST "$WEBHOOK_URL" \
             -H "Content-Type: application/json" \
-            -d "{\"content\":\"[${REPO}] PR #${PR_NUMBER} VERCEL ${STATE}\\n${CHECK_NAME}\\nPR: ${PR_URL}\\nDetails: ${DETAILS_URL}\"}"
+            -d "{\"content\":\"${MSG}\"}"
