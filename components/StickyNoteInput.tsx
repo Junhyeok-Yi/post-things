@@ -14,9 +14,6 @@ interface StickyNoteInputProps {
   currentNote: StickyNote | null;
   setCurrentNote: (note: StickyNote | null) => void;
   isClassifying?: boolean; // AI 분류 중 상태
-  meetingMode?: boolean;
-  meetingLabel?: string;
-  onToggleMeetingMode?: () => void;
 }
 
 export default function StickyNoteInput({
@@ -27,9 +24,6 @@ export default function StickyNoteInput({
   currentNote,
   setCurrentNote,
   isClassifying = false,
-  meetingMode = false,
-  meetingLabel = '활성 회의 없음',
-  onToggleMeetingMode,
 }: StickyNoteInputProps) {
   const [content, setContent] = useState('');
   const [isEditing, setIsEditing] = useState(true);
@@ -442,77 +436,62 @@ export default function StickyNoteInput({
 
   return (
     <div className={`min-h-screen flex items-center justify-center ${isActiveInput ? 'p-2 md:p-5' : 'p-5'} bg-gray-50 overscroll-none`}>
-      <div className="relative">
-        <button
-          type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onToggleMeetingMode?.();
-          }}
-          className={`absolute -top-3 -right-2 z-30 min-h-[44px] min-w-[92px] rounded-xl px-3 py-2 text-xs font-semibold shadow transition ${meetingMode ? 'bg-emerald-600 text-white' : 'bg-white text-slate-700 border border-slate-200'}`}
-          title={meetingLabel}
-        >
-          회의 {meetingMode ? 'ON' : 'OFF'}
-        </button>
+      <div
+        ref={containerRef}
+        className={`relative aspect-square ${isActiveInput ? 'w-[94vw] max-w-[430px] md:w-full md:max-w-md' : 'w-full max-w-sm'} ${stickyColor} rounded-lg shadow-lg transform cursor-pointer touch-none ${
+          isClassifying ? 'opacity-75' : ''
+        } ${isDragging ? 'scale-110 shadow-2xl' : isInteracting ? 'scale-105' : 'active:scale-95'}`}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        onDoubleClick={handleDoubleClick}
+        style={{ 
+          margin: isActiveInput ? '0 8px' : '0 20px',
+          transform: `translate(${offset.x}px, ${offset.y}px)`,
+          transition: isDragging ? 'transform 0s' : 'all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55)' // 드래그 중에는 즉시 반응
+        }}
+      >
+      {/* 포스트잇 상단 접착 부분 */}
+      <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-16 h-4 bg-yellow-300 rounded-b-sm opacity-60"></div>
 
-        <div
-          ref={containerRef}
-          className={`relative aspect-square ${isActiveInput ? 'w-[94vw] max-w-[430px] md:w-full md:max-w-md' : 'w-full max-w-sm'} ${stickyColor} rounded-lg shadow-lg transform cursor-pointer touch-none ${
-            isClassifying ? 'opacity-75' : ''
-          } ${isDragging ? 'scale-110 shadow-2xl' : isInteracting ? 'scale-105' : 'active:scale-95'}`}
-          onTouchStart={onTouchStart}
-          onTouchMove={onTouchMove}
-          onTouchEnd={onTouchEnd}
-          onDoubleClick={handleDoubleClick}
-          style={{ 
-            margin: isActiveInput ? '0 8px' : '0 20px',
-            transform: `translate(${offset.x}px, ${offset.y}px)`,
-            transition: isDragging ? 'transform 0s' : 'all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55)' // 드래그 중에는 즉시 반응
-          }}
-        >
-        {/* 포스트잇 상단 접착 부분 */}
-        <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-16 h-4 bg-yellow-300 rounded-b-sm opacity-60"></div>
+      {/* 텍스트 입력 영역 - 패딩 줄이고 전체 크기 활용 */}
+      <textarea
+        ref={textareaRef}
+        value={content}
+        onChange={(e) => setContent(e.target.value.slice(0, 100))}
+        onKeyDown={handleKeyDown}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => setIsFocused(false)}
+        placeholder="메모를 입력하세요."
+        className={`w-full h-full p-3 pt-8 pb-8 bg-transparent border-none outline-none resize-none ${fontSize} text-gray-800 placeholder-gray-500 leading-relaxed touch-auto transition-all duration-200`}
+        maxLength={100}
+        disabled={isClassifying}
+      />
+      
+      {/* 글자 수 표시 */}
+      <div className="absolute bottom-1 right-2 text-xs text-gray-500">
+        {content.length}/100
+      </div>
+      
+      {/* 안내 텍스트 - PC와 모바일 모두 지원 */}
+      <div className="absolute bottom-1 left-2 text-[11px] text-gray-500">
+        {isClassifying ? 'AI 분류 중...' : `↑완료 | ↓다이어그램 | ←→삭제`}
+      </div>
 
-        {/* 텍스트 입력 영역 - 패딩 줄이고 전체 크기 활용 */}
-        <textarea
-          ref={textareaRef}
-          value={content}
-          onChange={(e) => setContent(e.target.value.slice(0, 100))}
-          onKeyDown={handleKeyDown}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
-          placeholder="메모를 입력하세요."
-          className={`w-full h-full p-3 pt-8 pb-8 bg-transparent border-none outline-none resize-none ${fontSize} text-gray-800 placeholder-gray-500 leading-relaxed touch-auto transition-all duration-200`}
-          maxLength={100}
-          disabled={isClassifying}
-        />
-        
-        {/* 글자 수 표시 */}
-        <div className="absolute bottom-1 right-2 text-xs text-gray-500">
-          {content.length}/100
-        </div>
-        
-        {/* 안내 텍스트 - PC와 모바일 모두 지원 */}
-        <div className="absolute bottom-1 left-2 text-[11px] text-gray-500">
-          {isClassifying ? 'AI 분류 중...' : `↑완료 | ↓다이어그램 | ←→삭제 | ${meetingMode ? '회의모드' : '일반모드'}`}
-        </div>
-
-        {/* 피드백 아이콘 */}
-        {feedback && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20 rounded-lg">
-            <div className="bg-white rounded-full p-3 shadow-lg">
-              {feedback === 'save' ? (
-                <Check className="w-8 h-8 text-green-500" />
-              ) : feedback === 'delete' ? (
-                <X className="w-8 h-8 text-red-500" />
-              ) : feedback === 'classifying' ? (
-                <Brain className="w-8 h-8 text-blue-500 animate-pulse" />
-              ) : null}
-            </div>
+      {/* 피드백 아이콘 */}
+      {feedback && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20 rounded-lg">
+          <div className="bg-white rounded-full p-3 shadow-lg">
+            {feedback === 'save' ? (
+              <Check className="w-8 h-8 text-green-500" />
+            ) : feedback === 'delete' ? (
+              <X className="w-8 h-8 text-red-500" />
+            ) : feedback === 'classifying' ? (
+              <Brain className="w-8 h-8 text-blue-500 animate-pulse" />
+            ) : null}
           </div>
-        )}
         </div>
+      )}
       </div>
     </div>
   );
