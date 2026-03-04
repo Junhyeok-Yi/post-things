@@ -12,9 +12,18 @@ permissions:
 
 jobs:
   notify-pr:
-    if: github.event_name == 'pull_request' && secrets.DISCORD_WEBHOOK_URL != ''
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
+      - name: Skip when webhook secret is missing
+        env:
+          WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          if [ -z "$WEBHOOK_URL" ]; then
+            echo "DISCORD_WEBHOOK_URL is not set; skipping."
+            exit 0
+          fi
+
       - name: Send PR event to Discord
         env:
           WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
@@ -40,9 +49,18 @@ jobs:
             -d "{\"content\":\"[${REPO}] PR #${PR_NUMBER} ${STATUS}\\n${PR_TITLE}\\n${PR_URL}\"}"
 
   notify-vercel:
-    if: github.event_name == 'check_run' && secrets.DISCORD_WEBHOOK_URL != ''
+    if: github.event_name == 'check_run'
     runs-on: ubuntu-latest
     steps:
+      - name: Skip when webhook secret is missing
+        env:
+          WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          if [ -z "$WEBHOOK_URL" ]; then
+            echo "DISCORD_WEBHOOK_URL is not set; skipping."
+            exit 0
+          fi
+
       - name: Send Vercel check event to Discord
         env:
           WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
