@@ -1,13 +1,13 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { StickyNote } from '@/lib/types';
+import { StickyNote, Category } from '@/lib/types';
 import { getCategoryColor, categorizeForPreview } from '@/lib/ai-categorizer';
 import { useGestures } from '@/hooks/useGestures';
 import { Check, X, Brain } from 'lucide-react';
 
 interface StickyNoteInputProps {
-  onSave: (content: string) => void;
+  onSave: (content: string, category: Category) => void;
   onDelete: (id: string) => void;
   onComplete: (id: string) => void; // 완료 처리 함수
   onSwitchToAffinity: () => void;
@@ -46,6 +46,7 @@ export default function StickyNoteInput({
   const [stickyColor, setStickyColor] = useState(getInitialColor());
   const [isMounted, setIsMounted] = useState(false); // 클라이언트 마운트 확인
   const [fontSize, setFontSize] = useState('text-xl'); // 동적 폰트 크기
+  const [selectedCategory, setSelectedCategory] = useState<Category>('메모');
   
   // 인터랙션 관련 상태
   const [offset, setOffset] = useState({ x: 0, y: 0 });
@@ -121,7 +122,8 @@ export default function StickyNoteInput({
     if (content.trim() && isMounted && !currentNote) {
       // 🚀 새로운 통합 분류 시스템 사용 (일관성 보장)
       const previewCategory = categorizeForPreview(content);
-      
+      setSelectedCategory(previewCategory);
+
       const previewColor = getCategoryColor(previewCategory);
       const colorMap = {
         yellow: 'bg-yellow-200',
@@ -159,12 +161,14 @@ export default function StickyNoteInput({
       };
       // 즉시 색상 설정으로 깜빡임 방지
       setStickyColor(colorMap[currentNote.color]);
+      setSelectedCategory(currentNote.category);
     } else {
       setContent('');
       setIsEditing(true);
       setIsFocused(false);
       // 새 메모는 기본 노란색으로 시작
       setStickyColor('bg-yellow-200');
+      setSelectedCategory('메모');
     }
   }, [currentNote]);
 
@@ -195,7 +199,7 @@ export default function StickyNoteInput({
   const handleSave = () => {
     if (content.trim() && !isClassifying) {
       setFeedback('classifying');
-      onSave(content.trim());
+      onSave(content.trim(), selectedCategory);
       setContent('');
       setCurrentNote(null);
       setIsEditing(true);
@@ -454,6 +458,20 @@ export default function StickyNoteInput({
       {/* 포스트잇 상단 접착 부분 */}
       <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-16 h-4 bg-yellow-300 rounded-b-sm opacity-60"></div>
 
+      {/* 카테고리 태그 선택 */}
+      <div className="absolute top-6 left-3 z-10 flex items-center gap-1 rounded-md bg-white/70 px-1 py-1 backdrop-blur-sm">
+        {(['To-Do', '메모', '아이디어'] as Category[]).map((cat) => (
+          <button
+            key={cat}
+            type="button"
+            onClick={() => setSelectedCategory(cat)}
+            className={`px-2 py-0.5 text-[11px] rounded ${selectedCategory === cat ? 'bg-slate-800 text-white' : 'bg-white text-slate-700 border border-slate-200'}`}
+          >
+            {cat}
+          </button>
+        ))}
+      </div>
+
       {/* 텍스트 입력 영역 - 패딩 줄이고 전체 크기 활용 */}
       <textarea
         ref={textareaRef}
@@ -463,7 +481,7 @@ export default function StickyNoteInput({
         onFocus={() => setIsFocused(true)}
         onBlur={() => setIsFocused(false)}
         placeholder="메모를 입력하세요."
-        className={`w-full h-full p-3 pt-8 pb-8 bg-transparent border-none outline-none resize-none ${fontSize} text-gray-800 placeholder-gray-500 leading-relaxed touch-auto transition-all duration-200`}
+        className={`w-full h-full p-3 pt-14 pb-8 bg-transparent border-none outline-none resize-none ${fontSize} text-gray-800 placeholder-gray-500 leading-relaxed touch-auto transition-all duration-200`}
         maxLength={100}
         disabled={isClassifying}
       />
