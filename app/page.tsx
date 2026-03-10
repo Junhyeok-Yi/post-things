@@ -12,17 +12,10 @@ import {
   checkSupabaseConnection 
 } from '@/lib/supabase-api';
 import { supabase } from '@/lib/supabase';
+import { generateMeetingTitle } from '@/lib/meeting-title-generator';
 import StickyNoteInput from '@/components/StickyNoteInput';
 import AffinityDiagram from '@/components/AffinityDiagram';
 import { useToast } from "@/hooks/use-toast";
-
-type MeetingSession = {
-  id: string;
-  title: string;
-  status: 'active' | 'ended';
-  started_at: string;
-  ended_at: string | null;
-};
 
 export default function Home() {
   const [viewMode, setViewMode] = useState<ViewMode>('memo');
@@ -31,83 +24,11 @@ export default function Home() {
   const [isClassifying, setIsClassifying] = useState(false);
   const [isSupabaseConnected, setIsSupabaseConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [meetingMode, setMeetingMode] = useState(false);
-  const [activeMeeting, setActiveMeeting] = useState<MeetingSession | null>(null);
   const { toast } = useToast();
-
-  const parseJsonSafe = async (res: Response): Promise<{ json: unknown; raw: string }> => {
-    const raw = await res.text();
-    if (!raw) return { json: null, raw: '' };
-    try {
-      return { json: JSON.parse(raw), raw };
-    } catch {
-      return { json: null, raw };
-    }
-  };
-
-  const fetchActiveMeeting = async () => {
-    try {
-      const res = await fetch('/api/meetings/active', { cache: 'no-store' });
-      const { json, raw } = await parseJsonSafe(res);
-      if (!res.ok) {
-        const msg = (json as { error?: string } | null)?.error || `활성 회의 조회 실패 (HTTP ${res.status})`;
-        throw new Error(`${msg}${raw ? ` | ${raw.slice(0, 120)}` : ''}`);
-      }
-      const session = (json as { activeSession?: MeetingSession | null } | null)?.activeSession ?? null;
-      setActiveMeeting(session);
-      setMeetingMode(Boolean(session));
-    } catch (error) {
-      console.error('활성 회의 조회 실패:', error);
-    }
-  };
-
-  const startMeetingMode = async () => {
-    const title = `회의 ${new Date().toLocaleString()}`;
-    const res = await fetch('/api/meetings/start', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title }),
-    });
-    const { json, raw } = await parseJsonSafe(res);
-    const data = json as { error?: string; session?: MeetingSession } | null;
-    if (!res.ok || !data?.session) {
-      const msg = data?.error || `회의 시작 실패 (HTTP ${res.status})`;
-      throw new Error(`${msg}${raw ? ` | ${raw.slice(0, 120)}` : ''}`);
-    }
-    setActiveMeeting(data.session);
-    setMeetingMode(true);
-  };
-
-  const endMeetingMode = async () => {
-    if (!activeMeeting?.id) {
-      setMeetingMode(false);
-      return;
-    }
-    const res = await fetch(`/api/meetings/${activeMeeting.id}/end`, { method: 'POST' });
-    const { json, raw } = await parseJsonSafe(res);
-    const data = json as { error?: string } | null;
-    if (!res.ok && res.status !== 409) {
-      const msg = data?.error || `회의 종료 실패 (HTTP ${res.status})`;
-      throw new Error(`${msg}${raw ? ` | ${raw.slice(0, 120)}` : ''}`);
-    }
-    setActiveMeeting(null);
-    setMeetingMode(false);
-  };
-
-  const handleToggleMeetingMode = async () => {
-    try {
-      if (meetingMode) {
-        await endMeetingMode();
-        toast({ title: '회의 모드 OFF', description: '회의 모드를 종료했습니다.' });
-      } else {
-        await startMeetingMode();
-        toast({ title: '회의 모드 ON', description: '이제 작성한 메모는 현재 회의로 기록됩니다.' });
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : '회의 모드 전환 실패';
-      toast({ title: '회의 모드 전환 실패', description: message, variant: 'destructive' });
-    }
-  };
+  
+  // 회의록 모드 상태
+  const [isMeetingMode, setIsMeetingMode] = useState(false);
+  const [currentMeetingId, setCurrentMeetingId] = useState<string | null>(null);
 
   // 앱 초기화
   useEffect(() => {
@@ -125,9 +46,6 @@ export default function Home() {
           // Supabase에서 노트 가져오기
           const supabaseNotes = await fetchNotesFromSupabase();
           setNotes(supabaseNotes);
-
-          // 현재 활성 회의 상태 동기화
-          await fetchActiveMeeting();
         } else {
           // LocalStorage에서 노트 가져오기
           const savedNotes = localStorage.getItem('sticky-notes');
@@ -249,12 +167,14 @@ export default function Home() {
         const newNote: StickyNote = {
           id: crypto.randomUUID(),
           content,
-          category,
-          color: ['yellow', 'pink', 'blue', 'green'][Math.floor(Math.random() * 4)] as 'yellow' | 'pink' | 'blue' | 'green',
+          category: isMeetingMode ? '회의록' : category,
+          color: ['yellow', 'pink', 'blue', 'green', 'purple'][Math.floor(Math.random() * 5)] as 'yellow' | 'pink' | 'blue' | 'green' | 'purple',
           createdAt: now,
           updatedAt: now,
           isCompleted: false,
-          meetingSessionId: meetingMode ? activeMeeting?.id ?? null : null,
+          // 회의록 모드일 때 회의 정보 추가
+          meetingId: isMeetingMode && currentMeetingId ? currentMeetingId : undefined,
+          isMeetingMode: isMeetingMode,
         };
         
         const updatedNotes = [newNote, ...notes];
@@ -330,6 +250,51 @@ export default function Home() {
     }
   };
 
+  // 회의록 모드 토글
+  const toggleMeetingMode = async () => {
+    if (isMeetingMode) {
+      // 회의 종료: 제목 생성
+      if (currentMeetingId) {
+        const title = await generateMeetingTitle(currentMeetingId, notes);
+        
+        // 해당 회의의 모든 메모에 제목 추가
+        const meetingNotes = notes.filter(note => note.meetingId === currentMeetingId);
+        for (const note of meetingNotes) {
+          const updatedNote = { ...note, meetingTitle: title };
+          if (isSupabaseConnected) {
+            await updateNoteInSupabase(updatedNote);
+          }
+        }
+        
+        // 로컬에도 반영
+        const updatedNotes = notes.map(note => 
+          note.meetingId === currentMeetingId 
+            ? { ...note, meetingTitle: title }
+            : note
+        );
+        setNotes(updatedNotes);
+        
+        if (!isSupabaseConnected) {
+          localStorage.setItem('sticky-notes', JSON.stringify(updatedNotes));
+        }
+        
+        toast({
+          title: "회의 종료",
+          description: `"${title}" 제목으로 저장되었습니다.`,
+        });
+      }
+      setCurrentMeetingId(null);
+    } else {
+      // 회의 시작: 새 ID 생성
+      setCurrentMeetingId(crypto.randomUUID());
+      toast({
+        title: "회의록 모드 시작",
+        description: "이제 작성하는 모든 메모가 하나의 회의로 그룹화됩니다.",
+      });
+    }
+    setIsMeetingMode(!isMeetingMode);
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -339,25 +304,7 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen relative">
-      {/* 회의 모드 토글 버튼 - 화면 우상단 고정 */}
-      {isSupabaseConnected && (
-        <div className="fixed top-4 right-4 z-30">
-          <button
-            type="button"
-            onClick={handleToggleMeetingMode}
-            className={`min-h-[44px] min-w-[92px] rounded-xl px-4 py-2 text-sm font-semibold shadow-lg transition-all duration-200 ease-in-out ${
-              meetingMode
-                ? 'bg-emerald-500 text-white hover:bg-emerald-600'
-                : 'bg-white text-slate-800 border border-slate-200 hover:bg-slate-50'
-            }`}
-            title={activeMeeting?.title ?? '새 회의 시작'}
-          >
-            회의 {meetingMode ? 'ON' : 'OFF'}
-          </button>
-        </div>
-      )}
-
+    <main className="min-h-screen">
       {viewMode === 'memo' ? (
         <StickyNoteInput
           currentNote={currentNote}
@@ -367,6 +314,8 @@ export default function Home() {
           onSwitchToAffinity={() => setViewMode('diagram')}
           onComplete={toggleNoteCompletion}
           isClassifying={isClassifying}
+          isMeetingMode={isMeetingMode}
+          onToggleMeetingMode={toggleMeetingMode}
         />
       ) : (
         <AffinityDiagram
@@ -377,15 +326,16 @@ export default function Home() {
           onNoteDelete={deleteNote}
         />
       )}
-
-      {/* 오프라인/로컬 모드에서만 표시 */}
-      {!isSupabaseConnected && (
-        <div className="fixed top-4 right-4 z-30">
-          <div className="px-3 py-1.5 rounded-lg text-xs md:text-sm font-medium bg-white/95 backdrop-blur-sm border border-amber-200 text-amber-700 shadow">
-            Local 모드
-          </div>
+      
+      {/* 🎨 M2Z1 스타일 동기화 상태 표시 (라이트 모드) */}
+      <div className="fixed top-6 right-6 z-30">
+        <div className="px-4 py-2 rounded-lg text-sm font-medium bg-white/90 backdrop-blur-sm border border-gray-200 flex items-center gap-3 shadow-lg">
+          <span className={`w-2 h-2 rounded-full ${isSupabaseConnected ? 'bg-green-500' : 'bg-amber-500'} animate-pulse`}></span>
+          <span className="text-gray-700">
+            {isSupabaseConnected ? 'Cloud Sync' : 'Local Mode'}
+          </span>
         </div>
-      )}
+      </div>
     </main>
   );
 }
