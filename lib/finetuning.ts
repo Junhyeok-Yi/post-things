@@ -101,7 +101,6 @@ export function calculateAccuracy(data: FinetuningData[]): {
         'To-Do': { correct: 0, total: 0 },
         '메모': { correct: 0, total: 0 },
         '아이디어': { correct: 0, total: 0 },
-        '회의록': { correct: 0, total: 0 },
       }
     };
   }
@@ -116,7 +115,6 @@ export function calculateAccuracy(data: FinetuningData[]): {
     'To-Do': { correct: 0, total: 0 },
     '메모': { correct: 0, total: 0 },
     '아이디어': { correct: 0, total: 0 },
-    '회의록': { correct: 0, total: 0 },
   };
   
   data.forEach(d => {
@@ -151,7 +149,6 @@ export function printFinetuningStats(): void {
   To-Do: ${stats.byCategory['To-Do'].total > 0 ? ((stats.byCategory['To-Do'].correct / stats.byCategory['To-Do'].total) * 100).toFixed(1) : 0}% (${stats.byCategory['To-Do'].correct}/${stats.byCategory['To-Do'].total})
   메모: ${stats.byCategory['메모'].total > 0 ? ((stats.byCategory['메모'].correct / stats.byCategory['메모'].total) * 100).toFixed(1) : 0}% (${stats.byCategory['메모'].correct}/${stats.byCategory['메모'].total})
   아이디어: ${stats.byCategory['아이디어'].total > 0 ? ((stats.byCategory['아이디어'].correct / stats.byCategory['아이디어'].total) * 100).toFixed(1) : 0}% (${stats.byCategory['아이디어'].correct}/${stats.byCategory['아이디어'].total})
-  회의록: ${stats.byCategory['회의록'].total > 0 ? ((stats.byCategory['회의록'].correct / stats.byCategory['회의록'].total) * 100).toFixed(1) : 0}% (${stats.byCategory['회의록'].correct}/${stats.byCategory['회의록'].total})
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   `);

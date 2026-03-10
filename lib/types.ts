@@ -1,8 +1,11 @@
+// 공통 카테고리 타입
+export type Category = 'To-Do' | '메모' | '아이디어';
+
 // 포스트잇 관련 타입 정의
 export interface StickyNote {
   id: string;
   content: string;
-  category: 'To-Do' | '메모' | '아이디어';
+  category: Category;
   color: 'yellow' | 'pink' | 'blue' | 'green';
   createdAt: Date;
   updatedAt: Date;

@@ -92,7 +92,7 @@ export async function generateMeetingTitle(
   notes: StickyNote[]
 ): Promise<string> {
   // 해당 회의의 메모만 필터링
-  const meetingNotes = notes.filter(note => note.meetingId === meetingId);
+  const meetingNotes = notes.filter(note => note.meetingSessionId === meetingId);
   
   if (meetingNotes.length === 0) {
     return '제목 없는 회의';

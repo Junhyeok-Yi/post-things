@@ -357,7 +357,6 @@ export default function AffinityDiagram({
                         note.color === 'yellow' ? 'bg-gradient-to-br from-yellow-200 to-yellow-300' :
                         note.color === 'pink' ? 'bg-gradient-to-br from-pink-200 to-pink-300' :
                         note.color === 'blue' ? 'bg-gradient-to-br from-blue-200 to-blue-300' :
-                        note.color === 'purple' ? 'bg-gradient-to-br from-purple-200 to-purple-300' :
                         'bg-gradient-to-br from-green-200 to-green-300'
                       } group-hover:shadow-2xl`}>
                         

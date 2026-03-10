@@ -167,14 +167,13 @@ export default function Home() {
         const newNote: StickyNote = {
           id: crypto.randomUUID(),
           content,
-          category: isMeetingMode ? '회의록' : category,
-          color: ['yellow', 'pink', 'blue', 'green', 'purple'][Math.floor(Math.random() * 5)] as 'yellow' | 'pink' | 'blue' | 'green' | 'purple',
+          category,
+          color: ['yellow', 'pink', 'blue', 'green'][Math.floor(Math.random() * 4)] as 'yellow' | 'pink' | 'blue' | 'green',
           createdAt: now,
           updatedAt: now,
           isCompleted: false,
-          // 회의록 모드일 때 회의 정보 추가
-          meetingId: isMeetingMode && currentMeetingId ? currentMeetingId : undefined,
-          isMeetingMode: isMeetingMode,
+          // 회의 모드일 때 세션 ID만 연결 (카테고리는 기존 3분류 유지)
+          meetingSessionId: isMeetingMode && currentMeetingId ? currentMeetingId : null,
         };
         
         const updatedNotes = [newNote, ...notes];
@@ -258,7 +257,7 @@ export default function Home() {
         const title = await generateMeetingTitle(currentMeetingId, notes);
         
         // 해당 회의의 모든 메모에 제목 추가
-        const meetingNotes = notes.filter(note => note.meetingId === currentMeetingId);
+        const meetingNotes = notes.filter(note => note.meetingSessionId === currentMeetingId);
         for (const note of meetingNotes) {
           const updatedNote = { ...note, meetingTitle: title };
           if (isSupabaseConnected) {
@@ -268,7 +267,7 @@ export default function Home() {
         
         // 로컬에도 반영
         const updatedNotes = notes.map(note => 
-          note.meetingId === currentMeetingId 
+          note.meetingSessionId === currentMeetingId 
             ? { ...note, meetingTitle: title }
             : note
         );

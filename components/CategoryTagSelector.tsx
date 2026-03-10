@@ -29,7 +29,6 @@ const CATEGORY_CONFIG: Record<Category, { emoji: string; color: string }> = {
   'To-Do': { emoji: '📌', color: 'text-pink-600 bg-pink-50 border-pink-200' },
   '메모': { emoji: '📝', color: 'text-amber-600 bg-amber-50 border-amber-200' },
   '아이디어': { emoji: '💡', color: 'text-blue-600 bg-blue-50 border-blue-200' },
-  '회의록': { emoji: '🎤', color: 'text-purple-600 bg-purple-50 border-purple-200' },
 };
 
 export function CategoryTagSelector({ 
@@ -73,13 +72,7 @@ export function CategoryTagSelector({
           <span className="mr-2">{CATEGORY_CONFIG['아이디어'].emoji}</span>
           <span>아이디어</span>
         </DropdownMenuItem>
-        <DropdownMenuItem 
-          onClick={() => onSelect('회의록')}
-          className="cursor-pointer"
-        >
-          <span className="mr-2">{CATEGORY_CONFIG['회의록'].emoji}</span>
-          <span>회의록</span>
-        </DropdownMenuItem>
+
       </DropdownMenuContent>
     </DropdownMenu>
   );
