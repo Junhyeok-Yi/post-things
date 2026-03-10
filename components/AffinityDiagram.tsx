@@ -298,7 +298,7 @@ export default function AffinityDiagram({
     <div
       key={note.id}
       onClick={(e) => handleNoteClick(note, e)}
-      className={`group relative aspect-square cursor-pointer transition-all duration-300 ${mobile ? 'snap-center shrink-0 w-[78vw] max-w-[340px]' : 'hover:scale-105'}`}
+      className={`group relative aspect-square cursor-pointer transition-all duration-300 ${mobile ? 'snap-center shrink-0 w-[84vw] max-w-[360px]' : 'hover:scale-105'}`}
     >
       <div className={`relative w-full h-full rounded-2xl shadow-lg transition-all duration-300 ${
         note.color === 'yellow' ? 'bg-gradient-to-br from-yellow-200 to-yellow-300' :
@@ -342,7 +342,7 @@ export default function AffinityDiagram({
 
         <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-12 h-3 bg-yellow-400/40 rounded-b-lg"></div>
 
-        <div className="relative h-full flex flex-col justify-between p-6 pt-8">
+        <div className="relative h-full flex flex-col justify-between p-5 pt-7">
           <div className="flex-1 flex items-center justify-center">
             <p className="text-gray-800 text-center leading-relaxed font-medium text-sm">
               {note.content}
@@ -451,6 +451,7 @@ export default function AffinityDiagram({
             const groupNotes = groupedNotes[group];
             const activeCount = groupNotes.filter(note => !note.isCompleted).length;
             const completedCount = groupNotes.filter(note => note.isCompleted).length;
+            const completionRate = groupNotes.length > 0 ? Math.round((completedCount / groupNotes.length) * 100) : 0;
 
             return (
               <section key={group} className="mb-6 md:mb-12 snap-start">
@@ -467,9 +468,9 @@ export default function AffinityDiagram({
                           <span className={`px-3 md:px-4 py-1.5 md:py-2 rounded-full text-xs md:text-sm font-medium border ${getTheme(group).badgeColor}`}>
                             {activeCount} items
                           </span>
-                          {group === 'To-Do' && completedCount > 0 && (
+                          {group === 'To-Do' && (
                             <span className={`px-3 py-1.5 md:py-2 rounded-full text-xs md:text-sm font-medium border ${getTheme(group).completedColor}`}>
-                              {completedCount} completed
+                              완료율 {completionRate}% ({completedCount}/{groupNotes.length})
                             </span>
                           )}
                         </div>
@@ -487,7 +488,7 @@ export default function AffinityDiagram({
                 </div>
 
                 {/* Desktop: existing grid */}
-                <div className="hidden md:grid grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-4 gap-4">
+                <div className="hidden md:grid grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
                   {groupNotes.map((note) => renderNoteCard(note, group, false))}
                 </div>
 
