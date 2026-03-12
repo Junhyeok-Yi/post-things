@@ -340,7 +340,6 @@ export default function AffinityDiagram({
           </DropdownMenu>
         </div>
 
-        <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-12 h-3 rounded-b-lg bg-white/55"></div>
         <div className="pointer-events-none absolute inset-0 rounded-2xl bg-[radial-gradient(circle_at_20%_12%,rgba(255,255,255,0.20),transparent_40%),radial-gradient(circle_at_82%_88%,rgba(0,0,0,0.10),transparent_45%),linear-gradient(to_bottom_right,rgba(255,255,255,0.05),rgba(0,0,0,0.03))]" />
 
         <div className="relative h-full flex flex-col justify-between p-6 pt-8">

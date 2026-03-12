@@ -114,7 +114,7 @@ export default function StickyNoteInput({
       
       // 사용 가능한 텍스트 영역 크기 계산 (패딩 제외)
       const availableHeight = textarea.clientHeight - 64; // 상하 패딩 32px씩 제외
-      const availableWidth = textarea.clientWidth - 24; // 좌우 패딩 12px씩 제외
+      const availableWidth = textarea.clientWidth - 64; // 좌우 패딩 32px씩 제외
       
       // 폰트 크기 옵션들 (큰 것부터 작은 것 순서)
       const fontSizes = [
@@ -472,15 +472,12 @@ export default function StickyNoteInput({
     return (
       <div className="min-h-screen flex items-center justify-center p-5 bg-gray-50">
         <div className="relative w-full max-w-sm aspect-square bg-gradient-to-br from-amber-100 via-orange-200 to-rose-300 rounded-lg shadow-lg" style={{ margin: '0 20px' }}>
-          <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-16 h-4 rounded-b-sm bg-white/55 backdrop-blur-[1px]"></div>
           <div className="pointer-events-none absolute inset-0 rounded-lg bg-[radial-gradient(circle_at_20%_12%,rgba(255,255,255,0.20),transparent_40%),radial-gradient(circle_at_82%_88%,rgba(0,0,0,0.10),transparent_45%),linear-gradient(to_bottom_right,rgba(255,255,255,0.05),rgba(0,0,0,0.03))]" />
           <textarea
             placeholder="메모를 입력하세요."
-            className="w-full h-full p-3 pt-8 pb-8 bg-transparent border-none outline-none resize-none text-xl font-medium text-slate-900 placeholder-slate-500 leading-relaxed"
+            className="w-full h-full p-8 bg-transparent border-none outline-none resize-none text-xl font-medium text-slate-900 placeholder-slate-500 leading-relaxed"
             disabled
           />
-          <div className="absolute bottom-1 right-2 text-xs text-slate-700/80">0/100</div>
-          <div className="absolute bottom-1 left-2 text-xs text-slate-700/80">로딩 중...</div>
         </div>
       </div>
     );
@@ -506,7 +503,6 @@ export default function StickyNoteInput({
         }}
       >
       {/* 포스트잇 상단 접착 부분 */}
-      <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-16 h-4 rounded-b-sm bg-white/55 backdrop-blur-[1px]"></div>
       <div className="pointer-events-none absolute inset-0 rounded-lg bg-[radial-gradient(circle_at_20%_12%,rgba(255,255,255,0.20),transparent_40%),radial-gradient(circle_at_82%_88%,rgba(0,0,0,0.10),transparent_45%),linear-gradient(to_bottom_right,rgba(255,255,255,0.05),rgba(0,0,0,0.03))]" />
 
       {/* 텍스트 입력 영역 - 패딩 줄이고 전체 크기 활용 */}
@@ -523,21 +519,11 @@ export default function StickyNoteInput({
         onFocus={() => setIsFocused(true)}
         onBlur={() => setIsFocused(false)}
         placeholder="메모를 입력하세요."
-        className={`w-full h-full p-3 pt-8 pb-8 bg-transparent border-none outline-none resize-none ${fontSize} font-medium text-slate-900 placeholder-slate-500 leading-relaxed touch-auto transition-all duration-200`}
+        className={`w-full h-full p-8 bg-transparent border-none outline-none resize-none ${fontSize} font-medium text-slate-900 placeholder-slate-500 leading-relaxed touch-auto transition-all duration-200`}
         maxLength={100}
         disabled={isClassifying}
       />
       
-      {/* 글자 수 표시 */}
-      <div className="absolute bottom-1 right-2 text-xs text-slate-700/80">
-        {content.length}/100
-      </div>
-      
-      {/* 안내 텍스트 - PC와 모바일 모두 지원 */}
-      <div className="absolute bottom-1 left-2 text-[11px] text-slate-700/80">
-        {isClassifying ? 'AI 분류 중...' : `↑완료 | ↓다이어그램 | ←→삭제`}
-      </div>
-
       {/* 중앙 하단 태그 드롭다운 (최종 태깅 파이널 터치) */}
       {isActiveInput && (
         <div
