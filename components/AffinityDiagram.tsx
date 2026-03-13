@@ -243,10 +243,15 @@ export default function AffinityDiagram({
     container.scrollTo({ top: nextTop, behavior: 'auto' });
   }, [sortType]);
 
-  const renderNoteCard = (note: StickyNote, group: string, mobile = false) => {
+  const renderNoteCard = (note: StickyNote, group: string, mobile = false, timelineMode = false) => {
     const meetingLabel = note.meetingSessionId
       ? meetingLabelBySessionId[note.meetingSessionId] ?? '회의'
       : null;
+
+    const timelineTypeLabel = note.category === 'To-Do' ? 'to-do' : 'memo';
+    const timelineMetaLabel = note.meetingSessionId
+      ? `${timelineTypeLabel} · 회의`
+      : timelineTypeLabel;
 
     return (
     <div
@@ -306,7 +311,7 @@ export default function AffinityDiagram({
           <div className="flex items-center justify-between pt-4 border-t border-black/10">
             <span className="text-xs text-slate-700 font-medium">{group}</span>
             <span className="text-xs text-slate-700 font-semibold">
-              {meetingLabel ? `(${meetingLabel})` : ''}
+              {timelineMode ? timelineMetaLabel : (meetingLabel ? `(${meetingLabel})` : '')}
             </span>
           </div>
         </div>
@@ -425,14 +430,14 @@ export default function AffinityDiagram({
                 {/* Mobile: 1x1 horizontal snap lane */}
                 <div className="md:hidden relative">
                   <div className="flex gap-4 overflow-x-auto overflow-y-visible pb-4 pr-6 snap-x snap-mandatory">
-                    {groupNotes.map((note) => renderNoteCard(note, group, true))}
+                    {groupNotes.map((note) => renderNoteCard(note, group, true, isTimeline))}
                   </div>
                   <div className="pointer-events-none absolute right-0 top-0 h-full w-10 bg-gradient-to-l from-white to-transparent" />
                 </div>
 
                 {/* Desktop: existing grid */}
                 <div className="hidden md:grid grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-4 gap-4">
-                  {groupNotes.map((note) => renderNoteCard(note, group, false))}
+                  {groupNotes.map((note) => renderNoteCard(note, group, false, isTimeline))}
                 </div>
 
                 {groupNotes.length === 0 && (

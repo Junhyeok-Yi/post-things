@@ -341,7 +341,7 @@ export default function Home() {
   return (
     <main className="min-h-screen relative">
       {/* 회의 모드 토글 버튼 - 화면 우상단 고정 */}
-      {isSupabaseConnected && (
+      {isSupabaseConnected && viewMode === 'memo' && (
         <div className="fixed top-4 right-4 z-30">
           <button
             type="button"
