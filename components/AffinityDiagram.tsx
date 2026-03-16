@@ -13,7 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-type SortType = 'category' | 'time';
+export type SortType = 'category' | 'time';
 
 interface AffinityDiagramProps {
   notes: StickyNote[];
@@ -21,6 +21,8 @@ interface AffinityDiagramProps {
   onSwitchToMemo: () => void;
   onNoteComplete: (id: string) => void;
   onNoteDelete: (id: string) => void;
+  sortType: SortType;
+  onSortTypeChange: (sortType: SortType) => void;
 }
 
 export default function AffinityDiagram({
@@ -28,9 +30,10 @@ export default function AffinityDiagram({
   onNoteSelect,
   onSwitchToMemo,
   onNoteComplete,
-  onNoteDelete
+  onNoteDelete,
+  sortType,
+  onSortTypeChange,
 }: AffinityDiagramProps) {
-  const [sortType, setSortType] = useState<SortType>('category');
   const [actionFeedback, setActionFeedback] = useState<{ [key: string]: 'complete' | 'delete' | null }>({});
   const scrollContainerRef = useRef<HTMLElement | null>(null);
   const scrollPositionsRef = useRef<Record<SortType, number>>({
@@ -233,7 +236,7 @@ export default function AffinityDiagram({
     if (container) {
       scrollPositionsRef.current[sortType] = container.scrollTop;
     }
-    setSortType(next);
+    onSortTypeChange(next);
   };
 
   useEffect(() => {

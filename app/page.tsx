@@ -13,7 +13,7 @@ import {
 } from '@/lib/supabase-api';
 import { supabase } from '@/lib/supabase';
 import StickyNoteInput from '@/components/StickyNoteInput';
-import AffinityDiagram from '@/components/AffinityDiagram';
+import AffinityDiagram, { SortType } from '@/components/AffinityDiagram';
 import { useToast } from "@/hooks/use-toast";
 
 type MeetingSession = {
@@ -33,6 +33,8 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true);
   const [meetingMode, setMeetingMode] = useState(false);
   const [activeMeeting, setActiveMeeting] = useState<MeetingSession | null>(null);
+  const [diagramSortType, setDiagramSortType] = useState<SortType>('category');
+  const [editEntryView, setEditEntryView] = useState<ViewMode>('memo');
   const { toast } = useToast();
 
   const parseJsonSafe = async (res: Response): Promise<{ json: unknown; raw: string }> => {
@@ -330,6 +332,17 @@ export default function Home() {
     }
   };
 
+  const handleDiagramNoteSelect = (note: StickyNote | null) => {
+    setEditEntryView('diagram');
+    setCurrentNote(note);
+  };
+
+  const handleEditedNoteSaved = () => {
+    if (editEntryView === 'diagram') {
+      setViewMode('diagram');
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -367,14 +380,17 @@ export default function Home() {
           onSwitchToAffinity={() => setViewMode('diagram')}
           onComplete={toggleNoteCompletion}
           isClassifying={isClassifying}
+          onEditedNoteSaved={handleEditedNoteSaved}
         />
       ) : (
         <AffinityDiagram
           notes={notes}
-          onNoteSelect={setCurrentNote}
+          onNoteSelect={handleDiagramNoteSelect}
           onSwitchToMemo={() => setViewMode('memo')}
           onNoteComplete={toggleNoteCompletion}
           onNoteDelete={deleteNote}
+          sortType={diagramSortType}
+          onSortTypeChange={setDiagramSortType}
         />
       )}
 

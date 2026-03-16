@@ -14,6 +14,7 @@ interface StickyNoteInputProps {
   currentNote: StickyNote | null;
   setCurrentNote: (note: StickyNote | null) => void;
   isClassifying?: boolean; // AI 분류 중 상태
+  onEditedNoteSaved?: () => void; // 기존 노트 수정 저장 후 후속 동작
 }
 
 export default function StickyNoteInput({
@@ -24,6 +25,7 @@ export default function StickyNoteInput({
   currentNote,
   setCurrentNote,
   isClassifying = false,
+  onEditedNoteSaved,
 }: StickyNoteInputProps) {
   const [content, setContent] = useState('');
   const [isEditing, setIsEditing] = useState(true);
@@ -268,6 +270,8 @@ export default function StickyNoteInput({
 
   const handleSave = () => {
     if (content.trim() && !isClassifying) {
+      const wasEditingExistingNote = Boolean(currentNote);
+
       setFeedback('classifying');
       onSave(content.trim(), resolvedCategory);
       setContent('');
@@ -275,6 +279,10 @@ export default function StickyNoteInput({
       setIsTagMenuOpen(false);
       setCurrentNote(null);
       setIsEditing(true);
+
+      if (wasEditingExistingNote) {
+        onEditedNoteSaved?.();
+      }
     }
   };
 
